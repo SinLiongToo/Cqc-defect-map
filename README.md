@@ -98,16 +98,23 @@ Everything runs in the browser — the file never leaves your machine.
   what's selected on the wafer/die maps — it answers "what dominates
   overall," not "what's in the current selection."
 - **Trend chart**: sits beside the Pareto chart, counting defect rows per
-  calendar date. The **Date column** dropdown only offers columns whose
-  header contains "date" (case-insensitive) — if none exist, it's disabled
-  with an explanatory message instead of guessing. Values are parsed with
-  `new Date(...)`; a column with a time-of-day component is grouped down to
-  its calendar date (year-month-day) rather than treated as near-unique
-  per-row timestamps, and rows with a blank or unparseable date are excluded
-  from the line (with a count of how many, below the chart) rather than
-  breaking the timeline. Points are plotted in chronological order but only
-  for dates that actually appear in the data — gaps are **not** filled in as
-  zero, since the column's real time granularity (daily, weekly, per-lot...)
+  date. The **Date column** dropdown only offers columns whose header
+  contains "date" (case-insensitive) — if none exist, it's disabled with an
+  explanatory message instead of guessing. Two value formats are
+  recognized: a bare 4-digit **work-week code** (`YYWW` — 2-digit year +
+  2-digit ISO week, e.g. `2405` = 2024, week 5, a common fab lot/date-code
+  convention), matched and handled *before* anything else, since
+  JavaScript's generic date parser would otherwise silently misread it as
+  the literal (nonsensical) calendar year 2405; and anything else parseable
+  by `new Date(...)`, grouped down to its calendar date (year-month-day) so
+  a column with a time-of-day component doesn't produce a near-unique
+  bucket per row. Rows with a blank, invalid-week (`WW` outside 1–53), or
+  otherwise unparseable value are excluded from the line (with a count of
+  how many, below the chart) rather than breaking the timeline. Points are
+  plotted in true chronological order (by real timestamp, not label text —
+  so e.g. work-week `2352` correctly sorts before `2401`) but only for
+  dates/weeks that actually appear in the data — gaps are **not** filled in
+  as zero, since the column's real granularity (daily, weekly, per-lot...)
   isn't known. Beyond 12 points, most x-axis text labels are thinned out to
   stay legible; every point is still plotted and shows its exact date/count
   on hover.

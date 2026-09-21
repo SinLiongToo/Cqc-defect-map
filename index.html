@@ -274,7 +274,7 @@
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
           <li>The <strong>Pareto Chart</strong> below the two maps counts how often each value of any column occurs (pick it from the <strong>Column</strong> dropdown) — sorted most to least common, with a cumulative-% line and an 80% "vital few" cutoff. It always covers every loaded defect, independent of whatever's selected above.</li>
-          <li>The <strong>Trend Chart</strong> beside it counts defect rows per date, for any column whose name contains "date" — pick it from the <strong>Date column</strong> dropdown. Only dates that actually appear in the file are plotted (gaps aren't filled in as zero); rows with a blank or unparseable date are excluded and noted below the chart.</li>
+          <li>The <strong>Trend Chart</strong> beside it counts defect rows per date, for any column whose name contains "date" — pick it from the <strong>Date column</strong> dropdown. A bare 4-digit value is read as a <code>YYWW</code> work-week code (e.g. <code>2405</code> = 2024, week 5); anything else is parsed as a normal date and collapsed to its calendar day. Only dates/weeks that actually appear in the file are plotted (gaps aren't filled in as zero); rows with a blank or unparseable value are excluded and noted below the chart.</li>
         </ol>
 
         <h3>File format</h3>

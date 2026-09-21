@@ -1505,24 +1505,69 @@
   // still shows its exact date and count.
   const TREND_MAX_LABELS = 12;
 
-  // Groups records by calendar date (year-month-day, in local time) parsed
-  // from the selected date-like column, and counts rows per date -- a
-  // column with a time-of-day component would otherwise produce a near-
-  // unique bucket per row instead of a usable daily trend. Rows whose value
-  // is blank or unparseable as a date are excluded (a trend line has no
-  // sensible place to put them), sorted chronologically ascending.
+  // A bare 4-digit value in a "date" column is a fab work-week code (YYWW:
+  // 2-digit year + 2-digit ISO week, e.g. "2405" = 2024, week 5) -- not a
+  // literal calendar year. JS's Date constructor would otherwise happily
+  // (and silently wrongly) parse "2405" as literally the year 2405, so this
+  // format is matched and handled before anything falls through to
+  // new Date().
+  const YYWW_RE = /^(\d{2})(\d{2})$/;
+
+  // Monday of the given ISO-8601 week (week 1 is defined as the week
+  // containing the year's first Thursday, equivalently the week containing
+  // Jan 4th) -- gives a real, correctly-orderable date for a YYWW code,
+  // reusing the same "collapse to one representative calendar date per
+  // bucket" approach already used for timestamped columns below.
+  function isoWeekMonday(year, week) {
+    const jan4 = new Date(year, 0, 4);
+    const jan4WeekdayMon0 = (jan4.getDay() + 6) % 7; // Monday=0 ... Sunday=6
+    const week1Monday = new Date(year, 0, 4 - jan4WeekdayMon0);
+    return new Date(week1Monday.getFullYear(), week1Monday.getMonth(), week1Monday.getDate() + (week - 1) * 7);
+  }
+
+  // Parses one raw cell value into a { sortKey, label } pair, or null if it
+  // isn't a recognizable date/work-week. sortKey is a real timestamp (so
+  // sorting is correct even if a column mixes formats); label is what's
+  // actually shown on the chart and used as the grouping bucket.
+  function parseTrendValue(raw) {
+    const trimmed = String(raw).trim();
+    const yyww = YYWW_RE.exec(trimmed);
+    if (yyww) {
+      const week = Number(yyww[2]);
+      if (week < 1 || week > 53) return null; // not a valid ISO week number
+      const year = 2000 + Number(yyww[1]);
+      const monday = isoWeekMonday(year, week);
+      return { sortKey: monday.getTime(), label: `${year}-W${yyww[2]}` };
+    }
+    const d = new Date(trimmed);
+    if (Number.isNaN(d.getTime())) return null;
+    // Collapsed to calendar date (year-month-day, local time) -- a column
+    // with a time-of-day component would otherwise produce a near-unique
+    // bucket per row instead of a usable daily trend.
+    const local = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const label = `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}`;
+    return { sortKey: local.getTime(), label };
+  }
+
+  // Groups records by the selected date-like column's parsed value and
+  // counts rows per bucket. Rows whose value is blank or unparseable are
+  // excluded (a trend line has no sensible place to put them), and buckets
+  // are sorted chronologically by their real timestamp, not by label text.
   function computeTrendData() {
-    const counts = new Map();
+    const groups = new Map(); // label -> { count, sortKey }
     let excluded = 0;
     for (const rec of state.records) {
       const raw = getColumnValue(rec, state.trendColumn);
       if (raw === null || raw === undefined || String(raw).trim() === '') { excluded++; continue; }
-      const d = new Date(raw);
-      if (Number.isNaN(d.getTime())) { excluded++; continue; }
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      counts.set(key, (counts.get(key) || 0) + 1);
+      const parsed = parseTrendValue(raw);
+      if (!parsed) { excluded++; continue; }
+      const g = groups.get(parsed.label);
+      if (g) g.count++;
+      else groups.set(parsed.label, { count: 1, sortKey: parsed.sortKey });
     }
-    const data = [...counts.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, count]) => ({ date, count }));
+    const data = [...groups.entries()]
+      .sort((a, b) => a[1].sortKey - b[1].sortKey)
+      .map(([date, g]) => ({ date, count: g.count }));
     return { data, excluded };
   }
 
