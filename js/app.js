@@ -26,6 +26,7 @@
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
     selectedDie: null,      // {x,y}
+    rawBytes: null,         // Uint8Array of the last-loaded file, kept for re-decoding on encoding change
   };
 
   /* ===================== DOM refs ===================== */
@@ -38,6 +39,8 @@
   const dropzone = el('dropzone');
   const dropzoneLabel = el('dropzoneLabel');
   const csvFileName = el('csvFileName');
+  const csvEncoding = el('csvEncoding');
+  const csvEncodingNote = el('csvEncodingNote');
   const csvError = el('csvError');
   const statsPanel = el('statsPanel');
   const statTotalDies = el('statTotalDies');
@@ -124,11 +127,70 @@
     return null;
   }
 
-  function parseCsvFile(file) {
+  const BOM_SIGNATURES = [
+    { bytes: [0xEF, 0xBB, 0xBF], encoding: 'utf-8', length: 3 },
+    { bytes: [0xFF, 0xFE], encoding: 'utf-16le', length: 2 },
+    { bytes: [0xFE, 0xFF], encoding: 'utf-16be', length: 2 },
+  ];
+
+  function detectBom(bytes) {
+    for (const sig of BOM_SIGNATURES) {
+      if (bytes.length >= sig.bytes.length && sig.bytes.every((b, i) => bytes[i] === b)) {
+        return sig;
+      }
+    }
+    return null;
+  }
+
+  function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('Failed to read file.'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function decodeCsvBytes(bytes, manualEncoding) {
+    const bom = detectBom(bytes);
+    const encoding = bom ? bom.encoding : manualEncoding;
+    const offset = bom ? bom.length : 0;
+    let text;
+    try {
+      text = new TextDecoder(encoding, { fatal: false }).decode(bytes.subarray(offset));
+    } catch (e) {
+      text = new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(offset));
+    }
+    text = text.replace(/^﻿/, '');
+    return { text, detectedEncoding: bom ? bom.encoding : null };
+  }
+
+  async function loadCsvFile(file) {
     csvError.hidden = true;
-    Papa.parse(file, {
+    csvEncodingNote.textContent = '';
+    try {
+      const buffer = await readFileAsArrayBuffer(file);
+      state.rawBytes = new Uint8Array(buffer);
+      decodeAndParse();
+    } catch (err) {
+      showCsvError(err.message || 'Failed to read file.');
+    }
+  }
+
+  function decodeAndParse() {
+    if (!state.rawBytes) return;
+    csvError.hidden = true;
+    const { text, detectedEncoding } = decodeCsvBytes(state.rawBytes, csvEncoding.value);
+    if (detectedEncoding) {
+      csvEncoding.value = detectedEncoding;
+      csvEncodingNote.textContent = `Detected a ${detectedEncoding.toUpperCase()} byte-order mark — using it automatically.`;
+    } else {
+      csvEncodingNote.textContent = '';
+    }
+    Papa.parse(text, {
       header: true,
       skipEmptyLines: true,
+      delimitersToGuess: [',', '\t', ';', '|'],
       complete: (results) => {
         try {
           handleParsedCsv(results.data, results.meta.fields || []);
@@ -136,7 +198,7 @@
           showCsvError(err.message);
         }
       },
-      error: (err) => showCsvError(err.message || 'Failed to parse CSV.'),
+      error: (err) => showCsvError(err.message || 'Failed to parse file.'),
     });
   }
 
@@ -207,7 +269,7 @@
     if (!file) return;
     csvFileName.textContent = file.name;
     dropzoneLabel.textContent = 'Replace CSV file';
-    parseCsvFile(file);
+    loadCsvFile(file);
   });
 
   ['dragenter', 'dragover'].forEach((evt) => {
@@ -222,8 +284,10 @@
     csvInput.files = e.dataTransfer.files;
     csvFileName.textContent = file.name;
     dropzoneLabel.textContent = 'Replace CSV file';
-    parseCsvFile(file);
+    loadCsvFile(file);
   });
+
+  csvEncoding.addEventListener('change', () => decodeAndParse());
 
   /* ===================== Inputs ===================== */
   function readInputs() {

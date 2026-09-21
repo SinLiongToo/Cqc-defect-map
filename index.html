@@ -72,10 +72,24 @@
         <h2 class="panel-title">Defect CSV</h2>
         <label class="dropzone" id="dropzone" for="csvInput">
           <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.6l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L11 13.6V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
-          <span id="dropzoneLabel">Click or drop CSV file</span>
-          <input type="file" id="csvInput" accept=".csv,text/csv" hidden />
+          <span id="dropzoneLabel">Click or drop CSV/TSV file</span>
+          <input type="file" id="csvInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden />
         </label>
         <p id="csvFileName" class="muted small"></p>
+
+        <label class="field">
+          <span>File Encoding</span>
+          <select id="csvEncoding">
+            <option value="utf-8" selected>UTF-8 (default)</option>
+            <option value="utf-16le">UTF-16 LE</option>
+            <option value="utf-16be">UTF-16 BE</option>
+            <option value="big5">Big5 (Traditional Chinese)</option>
+            <option value="gb18030">GBK / GB18030 (Simplified Chinese)</option>
+            <option value="shift_jis">Shift-JIS (Japanese)</option>
+            <option value="windows-1252">Windows-1252 / ANSI (Latin)</option>
+          </select>
+        </label>
+        <p id="csvEncodingNote" class="muted small"></p>
         <p id="csvError" class="error-text" hidden></p>
       </section>
 

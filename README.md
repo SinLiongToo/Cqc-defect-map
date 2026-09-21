@@ -1,23 +1,30 @@
 # CQC Defect Map
 
 A small, static, client-side tool for visualizing semiconductor wafer defect
-data from a CSV file: a full wafer die map with defect highlighting, and a
-per-die zoom view showing exact in-die defect locations.
+data from a CSV/TSV file: a full wafer die map with defect highlighting, and
+a second, always-visible die defect map showing exact in-die defect
+locations.
 
-Everything runs in the browser — the CSV never leaves your machine.
+Everything runs in the browser — the file never leaves your machine.
 
 **Live demo:** `https://SinLiongToo.github.io/Cqc-defect-map/`
 
 ## Features
 
 - Set wafer size (8" / 12"), die size (X/Y mm), and notch direction
-- Upload (or drag & drop) a defect CSV
-- Full wafer map: every die that geometrically fits the wafer, computed from
-  wafer + die size, with dies containing defects color-coded by defect count
-- Hover a die to see its (die_X, die_Y) coordinate and defect count
-- Click a die to open the Die Inspector: a zoomed view plotting each defect
-  at its exact (GDS-X, GDS-Y) offset from the die center, with a hover
-  tooltip and list showing every column from the CSV for that defect
+- Upload (or drag & drop) a defect CSV/TSV — comma, tab, semicolon or pipe
+  delimited files are auto-detected
+- Automatic UTF-8/UTF-16 byte-order-mark (BOM) detection, plus a manual
+  encoding selector (Big5, GBK/GB18030, Shift-JIS, Windows-1252) for files
+  saved in other locale encodings
+- **Wafer map**: every die that geometrically fits the wafer, computed from
+  wafer + die size, with dies containing defects color-coded by defect
+  count; hover a die to see its (die_X, die_Y) coordinate and defect count
+- **Die defect map**: always-visible second view plotting each defect of the
+  selected die at its exact (GDS-X, GDS-Y) offset from the die center, with
+  a hover tooltip and list showing every column from the CSV for that
+  defect. Click any die on the wafer map to inspect it here; it starts
+  auto-selected to the die with the most defects
 - Dark / light theme toggle (persisted locally), responsive layout for
   desktop and mobile
 
@@ -25,9 +32,11 @@ Everything runs in the browser — the CSV never leaves your machine.
 
 1. Open `index.html` (locally, or via the GitHub Pages URL above).
 2. Set **Wafer Size**, **Die Size X/Y**, and **Notch Direction** to match your data.
-3. Upload your defect CSV.
+3. Upload your defect CSV/TSV. If it doesn't look right, check **File
+   Encoding** — it's auto-set when a BOM is detected, otherwise pick the
+   encoding your export tool used and it re-parses immediately.
 4. Hover dies on the wafer map to inspect coordinates; click a die to see its
-   defects in detail.
+   defects in the die defect map below.
 
 ## CSV format
 
@@ -42,8 +51,19 @@ spaces/underscores/hyphens, so any of the listed aliases work:
 | Defect Y offset | `GDS-Y` | in **mm, relative to the die center** |
 
 Any additional columns (defect class, size, ID, etc.) are preserved and shown
-in the defect tooltip and detail list in the Die Inspector — no fixed schema
-beyond the four columns above.
+in the defect tooltip and detail list in the die defect map — no fixed
+schema beyond the four columns above.
+
+**Delimiters**: comma, tab, semicolon and pipe are auto-detected — a `.csv`,
+`.tsv`, or plain `.txt` extension all work.
+
+**Encoding**: a UTF-8 or UTF-16 byte-order mark (BOM), if present, is
+detected and used automatically. Otherwise the file is decoded as UTF-8 by
+default; if your data looks garbled (common with CSVs exported by
+locale-specific tools), switch **File Encoding** to match — Big5 and
+GBK/GB18030 for Traditional/Simplified Chinese exports, Shift-JIS for
+Japanese, or Windows-1252 for Western European ANSI exports. Changing the
+selector re-decodes the already-loaded file without needing to re-upload.
 
 A sample file is provided at [`sample-data/sample_defects.csv`](sample-data/sample_defects.csv)
 (12", 5mm x 5mm die — the UI's default settings).
