@@ -25,6 +25,8 @@
     dieSizeY: 5,
     scribeLaneUm: 80,
     edgeExclusionMm: 3,
+    centerOffsetX: 0,
+    centerOffsetY: 0,
     notch: 'down',
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
@@ -40,6 +42,9 @@
   const dieSizeYInput = el('dieSizeY');
   const scribeLaneInput = el('scribeLane');
   const edgeExclusionInput = el('edgeExclusion');
+  const centerOffsetXInput = el('centerOffsetX');
+  const centerOffsetYInput = el('centerOffsetY');
+  const autoCenterBtn = el('autoCenterBtn');
   const dieSizeHint = el('dieSizeHint');
   const dieSizeHintText = el('dieSizeHintText');
   const applyDieSizeSuggestion = el('applyDieSizeSuggestion');
@@ -67,6 +72,7 @@
   const dieCardTitle = el('dieCardTitle');
   const dieSvg = el('dieSvg');
   const dieEmptyState = el('dieEmptyState');
+  const DIE_EMPTY_DEFAULT_TEXT = dieEmptyState.textContent;
   const dieDefectList = el('dieDefectList');
   const closeDieCard = el('closeDieCard');
   const tooltip = el('tooltip');
@@ -364,10 +370,36 @@
     state.dieSizeY = Math.max(0.1, Number(dieSizeYInput.value) || 5);
     state.scribeLaneUm = Math.max(0, Number(scribeLaneInput.value) || 0);
     state.edgeExclusionMm = Math.max(0, Number(edgeExclusionInput.value) || 0);
+    state.centerOffsetX = Math.round(Number(centerOffsetXInput.value) || 0);
+    state.centerOffsetY = Math.round(Number(centerOffsetYInput.value) || 0);
     state.notch = notchSel.value;
   }
-  [waferSizeSel, dieSizeXInput, dieSizeYInput, scribeLaneInput, edgeExclusionInput, notchSel].forEach((input) => {
+  [
+    waferSizeSel, dieSizeXInput, dieSizeYInput, scribeLaneInput, edgeExclusionInput,
+    centerOffsetXInput, centerOffsetYInput, notchSel,
+  ].forEach((input) => {
     input.addEventListener('change', () => { readInputs(); render(); });
+  });
+
+  autoCenterBtn.addEventListener('click', () => {
+    if (!state.records.length) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const rec of state.records) {
+      minX = Math.min(minX, rec.dieX);
+      maxX = Math.max(maxX, rec.dieX);
+      minY = Math.min(minY, rec.dieY);
+      maxY = Math.max(maxY, rec.dieY);
+    }
+    readInputs();
+    const { maxI, maxJ } = computeDieGrid(); // geometric center, independent of any existing offset
+    state.centerOffsetX = Math.round((minX + maxX) / 2) - maxI;
+    state.centerOffsetY = Math.round((minY + maxY) / 2) - maxJ;
+    centerOffsetXInput.value = state.centerOffsetX;
+    centerOffsetYInput.value = state.centerOffsetY;
+    render();
   });
 
   /* ===================== Wafer geometry ===================== */
@@ -386,8 +418,12 @@
     const dies = [];
 
     // die_X/die_Y in the CSV are non-negative (first-quadrant indexing), with the
-    // wafer center falling at index (maxI, maxJ) — i.e. index 0 is the corner of
-    // the theoretical grid's bounding square, not the wafer center itself.
+    // wafer center falling at index (maxI + centerOffsetX, maxJ + centerOffsetY) —
+    // i.e. index 0 is the corner of the theoretical grid's bounding square, not
+    // the wafer center itself. The offset lets the index labeling be nudged to
+    // match a fab's actual numbering without moving any die's physical position.
+    const offsetX = state.centerOffsetX || 0;
+    const offsetY = state.centerOffsetY || 0;
     for (let i = -maxI; i <= maxI; i++) {
       for (let j = -maxJ; j <= maxJ; j++) {
         const cx = i * pitchX;
@@ -404,11 +440,11 @@
           // usable if it sits entirely clear of the edge exclusion ring.
           const farthestDist = Math.hypot(Math.abs(cx) + halfX, Math.abs(cy) + halfY);
           const usable = farthestDist <= usableRadiusMm;
-          dies.push({ i: i + maxI, j: j + maxJ, cx, cy, usable });
+          dies.push({ i: i + maxI + offsetX, j: j + maxJ + offsetY, cx, cy, usable });
         }
       }
     }
-    return { dies, radiusMm, diameterMm, usableRadiusMm };
+    return { dies, radiusMm, diameterMm, usableRadiusMm, maxI, maxJ };
   }
 
   function defectBucketColor(count) {
@@ -555,9 +591,8 @@
     const key = `${x},${y}`;
     const defects = state.defectsByDie.get(key) || [];
     state.selectedDie = { x, y };
-    dieEmptyState.hidden = true;
     dieCardTitle.textContent = `Die (${x}, ${y}) — ${defects.length} defect${defects.length === 1 ? '' : 's'}`;
-    renderDieDetail(defects);
+    renderDieDetail(defects, x, y);
     renderWafer(); // refresh selection outline
     dieCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -575,9 +610,16 @@
     return niceFraction * base;
   }
 
-  function renderDieDetail(defects) {
+  function renderDieDetail(defects, dieX, dieY) {
     dieSvg.innerHTML = '';
     dieDefectList.innerHTML = '';
+
+    if (!defects.length) {
+      dieEmptyState.textContent = `Die (${dieX}, ${dieY}) has no recorded defects.`;
+      dieEmptyState.hidden = false;
+      return;
+    }
+    dieEmptyState.hidden = true;
 
     const usableHalf = (DIE_VIEWBOX / 2) - DIE_MARGIN;
     const halfMmX = state.dieSizeX / 2;
@@ -666,13 +708,6 @@
       row.innerHTML = rowHtml;
       dieDefectList.appendChild(row);
     });
-
-    if (!defects.length) {
-      const empty = document.createElement('p');
-      empty.className = 'muted small';
-      empty.textContent = 'No defects recorded for this die.';
-      dieDefectList.appendChild(empty);
-    }
   }
 
   function escapeHtml(str) {
@@ -686,6 +721,7 @@
     dieCardTitle.textContent = '–';
     dieSvg.innerHTML = '';
     dieDefectList.innerHTML = '';
+    dieEmptyState.textContent = DIE_EMPTY_DEFAULT_TEXT;
     dieEmptyState.hidden = false;
     renderWafer();
   });

@@ -120,6 +120,8 @@ body {
 .field:last-child { margin-bottom: 0; }
 .field span { color: var(--text-muted); font-weight: 500; }
 .field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.label-with-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.small-icon-btn { width: 22px; height: 22px; border-radius: 6px; padding: 0; }
 select, input[type="number"] {
   background: var(--bg-inset); color: var(--text); border: 1px solid var(--border);
   border-radius: 8px; padding: 9px 10px; font-family: var(--font-mono); font-size: 13px;

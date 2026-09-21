@@ -72,6 +72,19 @@
           </label>
         </div>
 
+        <div class="field">
+          <span class="label-with-btn">
+            <span>Wafer Center (die index offset)</span>
+            <button type="button" class="icon-btn small-icon-btn" id="autoCenterBtn" title="Auto-center from loaded data" aria-label="Auto-center from loaded data">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2.06A7.002 7.002 0 0 1 18.94 11H21a1 1 0 1 1 0 2h-2.06A7.002 7.002 0 0 1 13 18.94V21a1 1 0 1 1-2 0v-2.06A7.002 7.002 0 0 1 5.06 13H3a1 1 0 1 1 0-2h2.06A7.002 7.002 0 0 1 11 5.06V3a1 1 0 0 1 1-1Zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>
+            </button>
+          </span>
+          <div class="field-row">
+            <input type="number" id="centerOffsetX" step="1" value="0" aria-label="Center offset X (die index)" title="Offset X" />
+            <input type="number" id="centerOffsetY" step="1" value="0" aria-label="Center offset Y (die index)" title="Offset Y" />
+          </div>
+        </div>
+
         <label class="field">
           <span>Notch Direction</span>
           <select id="notchDir">

@@ -32,7 +32,15 @@ Everything runs in the browser — the file never leaves your machine.
   a ruler (tick marks + µm labels) on both axes, and a hover tooltip and
   list showing ECID (if present) plus every column from the CSV for that
   defect. Click any die on the wafer map to inspect it here; it starts
-  auto-selected to the die with the most defects
+  auto-selected to the die with the most defects. If the selected die has
+  no recorded defects, the plot/ruler are hidden and a plain text message
+  is shown instead
+- **Wafer center offset**: a die index offset (X/Y) that shifts which
+  physical die the wafer's geometric center maps to, in case a fab's die
+  numbering doesn't put the wafer center at the simple auto-computed
+  midpoint. Set it manually, or click the auto-center icon to derive it
+  from the loaded data (centers on the midpoint of the die_X/die_Y range
+  actually present in the file)
 - **Die size validation**: since a defect's GDS offset can't exceed half the
   true die size, the app checks loaded data against the current Die Size
   setting and shows a suggestion banner (with a one-click Apply) if the data
@@ -108,8 +116,9 @@ convention below).
   `(0, 0)` is the grid's corner, not the wafer center. The wafer center
   falls at index `(centerX, centerY)`, where `centerX`/`centerY` are
   auto-computed as half the total die columns/rows spanning the wafer
-  diameter (`ceil(waferRadius / pitchX) + 1`, and likewise for Y). A die's
-  physical center relative to the wafer center is therefore
+  diameter (`ceil(waferRadius / pitchX) + 1`, and likewise for Y) **plus**
+  the Wafer Center offset (0 by default). A die's physical center relative
+  to the wafer center is therefore
   `((die_X - centerX) * pitchX, (die_Y - centerY) * pitchY)` mm. A die is
   drawn if any part of its footprint overlaps the wafer circle (so partial
   edge dies are included, matching typical wafer map tools).
