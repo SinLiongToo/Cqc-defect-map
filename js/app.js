@@ -37,7 +37,7 @@
     gdsCalibratedCenterXUm: null,
     gdsCalibratedCenterYUm: null,
     dieRotationDeg: 0,
-    gridLineColor: null,    // hex string once user picks one, else CSS default
+    gridLineColor: '#ff3b3b', // defaults to red; user can repick via the Grid Color input
     notch: 'down',
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
@@ -950,7 +950,7 @@
     // "nice" round interval, covering the full plotted extent (not just the
     // die outline).
     const pxPerUm = mmToPx / 1000;
-    const TARGET_TICKS = 4;
+    const TARGET_TICKS = 8;
     const stepUm = niceStep(Math.max(halfWidthUm, halfHeightUm) / TARGET_TICKS);
     const TICK_LEN = 5;
     // Grid lines, crosshair, and axis labels span the full plotted extent

@@ -30,7 +30,8 @@ Everything runs in the browser — the file never leaves your machine.
 - **Die defect map**: a composite view plotting *every* defect from *every*
   die at its exact (GDS-X, GDS-Y) absolute coordinate, in the shared
   die-local coordinate system (all dies use the same Die Size), with grid
-  lines (color customizable via **Grid Color**) and a ruler (tick marks +
+  lines (red by default, denser than before, color customizable via
+  **Grid Color**) and a ruler (tick marks +
   µm labels, in absolute coordinates matching the tooltips) on both axes —
   useful for spotting systematic vs. random defect clustering across the
   whole wafer. Click a die on the wafer map — or a dot on the composite
