@@ -5,8 +5,8 @@
   // Bumped by hand on each ship (see the "ship" skill) -- there's no build
   // step to derive this from automatically, so it's the one thing that has
   // to be remembered and edited alongside a release rather than computed.
-  const APP_VERSION = 'v1.1.0';
-  const APP_UPDATED = '2026-09-22 02:22 (UTC+8)';
+  const APP_VERSION = 'v1.1.1';
+  const APP_UPDATED = '2026-09-22 05:47 (UTC+8)';
   const WAFER_DIAMETER_MM = { 8: 200, 12: 300 };
   const NOTCH_ANGLE_DEG = { down: 0, right: 90, up: 180, left: 270 };
   const SVG_NS = 'http://www.w3.org/2000/svg';

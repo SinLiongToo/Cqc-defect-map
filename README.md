@@ -225,6 +225,27 @@ same data in both formats (12", 5mm x 5mm die — the UI's default settings;
 note the die indices are centered around 31 to match the first-quadrant
 convention below).
 
+## Terminology
+
+A file can have more than one column with "date" in its name, each meaning
+something different along a typical fab-to-field timeline — worth knowing
+which is which before picking one for the Trend Chart:
+
+- **Fab date** — when the die itself was manufactured at the fab.
+- **Date code** — when the device was assembled/packaged. Normally on or
+  after the fab date, but that ordering isn't guaranteed if the assembly
+  used leftover (older) die stock.
+- **Return date** — when the part came back for CQC analysis. Typically
+  around six months after the date code, if the return cycle is relatively
+  quick.
+
+**Die defect map** plots each defect's physical location from
+failure-analysis results, showing which circuit or which physical layer is
+affected. **Wafer map** shows the defect distribution across the whole
+wafer — useful for spotting any commonality in the wafer's physical layout,
+and worth comparing against the fab's own wafer defect map (if available)
+to see whether a pattern originated at the fab or downstream.
+
 ## Assumptions / conventions
 
 - **Wafer diameter**: 8" → 200 mm, 12" → 300 mm (standard nominal fab sizes,

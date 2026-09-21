@@ -312,6 +312,28 @@
           <code>GDS-X</code>/<code>GDS-Y</code> still counts on the wafer
           map but isn't plotted on the die defect map.
         </p>
+
+        <h3>Terminology</h3>
+        <p class="muted small">
+          A file can have more than one column with "date" in its name, each
+          meaning something different along a typical fab-to-field
+          timeline — worth knowing which is which before picking one for the
+          Trend Chart:
+        </p>
+        <ul class="small muted col-list">
+          <li><strong>Fab date</strong> — when the die itself was manufactured at the fab.</li>
+          <li><strong>Date code</strong> — when the device was assembled/packaged. Normally on or after the fab date, but that ordering isn't guaranteed if the assembly used leftover (older) die stock.</li>
+          <li><strong>Return date</strong> — when the part came back for CQC analysis. Typically around six months after the date code, if the return cycle is relatively quick.</li>
+        </ul>
+        <p class="muted small">
+          <strong>Die defect map</strong> plots each defect's physical
+          location from failure-analysis results, showing which circuit or
+          which physical layer is affected. <strong>Wafer map</strong> shows
+          the defect distribution across the whole wafer — useful for
+          spotting any commonality in the wafer's physical layout, and worth
+          comparing against the fab's own wafer defect map (if available) to
+          see whether a pattern originated at the fab or downstream.
+        </p>
       </div>
     </div>
   </div>
