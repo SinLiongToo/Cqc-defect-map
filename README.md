@@ -21,10 +21,12 @@ Everything runs in the browser — the file never leaves your machine.
   Windows-1252) for files saved in other locale encodings
 - **Wafer map**: every die that geometrically fits the wafer, computed from
   wafer + die size, with dies containing defects color-coded by defect
-  count; hover a die to see its (die_X, die_Y) coordinate and defect count
+  count; hover a die to see its (die_X, die_Y) coordinate, defect count, and
+  ECID(s) if an ECID/CQC-number column is present
 - **Die defect map**: always-visible second view plotting each defect of the
   selected die at its exact (GDS-X, GDS-Y) offset from the die center, with
-  a hover tooltip and list showing every column from the CSV for that
+  a ruler (tick marks + µm labels) on both axes, and a hover tooltip and
+  list showing ECID (if present) plus every column from the CSV for that
   defect. Click any die on the wafer map to inspect it here; it starts
   auto-selected to the die with the most defects
 - Dark / light theme toggle (persisted locally), responsive layout for
@@ -54,10 +56,11 @@ so any of the listed aliases work, for either format:
 | Die row index | `die_Y`, `Y coordinate` | non-negative integer grid index of the die on the wafer |
 | Defect X offset | `GDS-X` | in **µm, relative to the die center** |
 | Defect Y offset | `GDS-Y` | in **µm, relative to the die center** |
+| ECID / chip ID *(optional)* | `ECID`, `CQC number`, `CQC ID`, `CQC` | shown prominently in both maps' hover tooltips if present |
 
-Any additional columns (defect class, size, ID, etc.) are preserved and shown
-in the defect tooltip and detail list in the die defect map — no fixed
-schema beyond the four columns above.
+Any other columns (defect class, size, etc.) are preserved and shown in the
+defect tooltip and detail list in the die defect map — no fixed schema
+beyond the columns above.
 
 **Delimiters** (CSV/TSV/TXT only): comma, tab, semicolon and pipe are
 auto-detected — a `.csv`, `.tsv`, or plain `.txt` extension all work.

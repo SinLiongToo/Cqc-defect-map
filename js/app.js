@@ -15,6 +15,7 @@
     dieY: ['diey', 'ycoordinate', 'y'],
     gdsX: ['gdsx'],
     gdsY: ['gdsy'],
+    ecid: ['ecid', 'cqcnumber', 'cqcno', 'cqcid', 'cqc'],
   };
 
   /* ===================== State ===================== */
@@ -266,6 +267,7 @@
     const dieYCol = matchColumn(headers, HEADER_ALIASES.dieY);
     const gdsXCol = matchColumn(headers, HEADER_ALIASES.gdsX);
     const gdsYCol = matchColumn(headers, HEADER_ALIASES.gdsY);
+    const ecidCol = matchColumn(headers, HEADER_ALIASES.ecid); // optional
 
     const missing = [];
     if (!dieXCol) missing.push('die_X / X coordinate');
@@ -276,7 +278,7 @@
       throw new Error(`CSV is missing required column(s): ${missing.join(', ')}`);
     }
 
-    const knownCols = new Set([dieXCol, dieYCol, gdsXCol, gdsYCol]);
+    const knownCols = new Set([dieXCol, dieYCol, gdsXCol, gdsYCol, ecidCol].filter(Boolean));
     const extraCols = headers.filter((h) => !knownCols.has(h));
 
     const records = [];
@@ -290,8 +292,9 @@
       }
       const raw = {};
       for (const col of extraCols) raw[col] = row[col];
+      const ecid = ecidCol ? row[ecidCol] : null;
       // GDS-X/GDS-Y are given in micrometers; convert to mm (matches die size units) for plotting.
-      records.push({ dieX, dieY, gdsXUm, gdsYUm, gdsX: gdsXUm / 1000, gdsY: gdsYUm / 1000, raw });
+      records.push({ dieX, dieY, gdsXUm, gdsYUm, gdsX: gdsXUm / 1000, gdsY: gdsYUm / 1000, ecid, raw });
     }
 
     if (!records.length) {
@@ -393,6 +396,27 @@
     return 'var(--danger)';
   }
 
+  function formatEcidList(defects) {
+    if (!defects || !defects.length) return null;
+    const seen = [];
+    for (const rec of defects) {
+      const val = rec.ecid;
+      if (val !== null && val !== undefined && val !== '' && !seen.includes(val)) seen.push(val);
+    }
+    if (!seen.length) return null;
+    const MAX_SHOWN = 4;
+    const shown = seen.slice(0, MAX_SHOWN).join(', ');
+    return seen.length > MAX_SHOWN ? `${shown}, +${seen.length - MAX_SHOWN} more` : shown;
+  }
+
+  function dieHoverText(x, y, defects) {
+    const count = defects ? defects.length : 0;
+    const lines = [`Die (${x}, ${y})`, `Defects: ${count}`];
+    const ecidList = formatEcidList(defects);
+    if (ecidList) lines.push(`ECID: ${ecidList}`);
+    return lines.join('\n');
+  }
+
   function renderLegend() {
     legend.innerHTML = '';
     const items = [
@@ -461,12 +485,9 @@
         fill, stroke: 'var(--die-empty-stroke)',
         'data-die-x': die.i, 'data-die-y': die.j, 'data-count': count,
       });
-      rect.addEventListener('mouseenter', (e) => {
-        showTooltip(e.clientX, e.clientY, `Die (${die.i}, ${die.j})\nDefects: ${count}`);
-      });
-      rect.addEventListener('mousemove', (e) => {
-        showTooltip(e.clientX, e.clientY, `Die (${die.i}, ${die.j})\nDefects: ${count}`);
-      });
+      const dieTip = dieHoverText(die.i, die.j, defects);
+      rect.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, dieTip));
+      rect.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, dieTip));
       rect.addEventListener('mouseleave', hideTooltip);
       rect.addEventListener('click', () => selectDie(die.i, die.j));
       group.appendChild(rect);
@@ -502,6 +523,19 @@
     dieCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  function niceStep(rough) {
+    if (!(rough > 0)) return 1;
+    const exp = Math.floor(Math.log10(rough));
+    const base = Math.pow(10, exp);
+    const fraction = rough / base;
+    let niceFraction;
+    if (fraction <= 1) niceFraction = 1;
+    else if (fraction <= 2) niceFraction = 2;
+    else if (fraction <= 5) niceFraction = 5;
+    else niceFraction = 10;
+    return niceFraction * base;
+  }
+
   function renderDieDetail(defects) {
     dieSvg.innerHTML = '';
     dieDefectList.innerHTML = '';
@@ -532,11 +566,47 @@
       class: 'axis-label', x: centerPx + 6, y: centerPx - dieH / 2 + 10,
     })).textContent = `+Y`;
 
+    // Ruler: tick marks + um labels along both axes, spaced at a "nice" round interval.
+    const halfWidthUm = halfMmX * 1000;
+    const halfHeightUm = halfMmY * 1000;
+    const pxPerUm = mmToPx / 1000;
+    const TARGET_TICKS = 4;
+    const stepUm = niceStep(Math.max(halfWidthUm, halfHeightUm) / TARGET_TICKS);
+    const TICK_LEN = 5;
+
+    for (let vUm = stepUm; vUm <= halfWidthUm + 1e-6; vUm += stepUm) {
+      for (const sign of [1, -1]) {
+        const tx = centerPx + sign * vUm * pxPerUm;
+        dieSvg.appendChild(svgEl('line', {
+          class: 'tick-mark', x1: tx, y1: centerPx - TICK_LEN, x2: tx, y2: centerPx + TICK_LEN,
+        }));
+        dieSvg.appendChild(svgEl('text', {
+          class: 'axis-label tick-label', x: tx, y: centerPx + TICK_LEN + 11, 'text-anchor': 'middle',
+        })).textContent = `${sign * Math.round(vUm)}`;
+      }
+    }
+    for (let vUm = stepUm; vUm <= halfHeightUm + 1e-6; vUm += stepUm) {
+      for (const sign of [1, -1]) {
+        const ty = centerPx - sign * vUm * pxPerUm;
+        dieSvg.appendChild(svgEl('line', {
+          class: 'tick-mark', x1: centerPx - TICK_LEN, y1: ty, x2: centerPx + TICK_LEN, y2: ty,
+        }));
+        dieSvg.appendChild(svgEl('text', {
+          class: 'axis-label tick-label', x: centerPx - TICK_LEN - 4, y: ty + 3, 'text-anchor': 'end',
+        })).textContent = `${sign * Math.round(vUm)}`;
+      }
+    }
+    dieSvg.appendChild(svgEl('text', {
+      class: 'axis-label tick-label', x: centerPx - dieW / 2 + 4, y: centerPx - dieH / 2 + 12,
+    })).textContent = 'µm';
+
     defects.forEach((rec, idx) => {
       const px = centerPx + rec.gdsX * mmToPx;
       const py = centerPx - rec.gdsY * mmToPx;
       const dot = svgEl('circle', { class: 'defect-dot', cx: px, cy: py, r: 5, 'data-idx': idx });
-      const tipLines = [`Defect #${idx + 1}`, `GDS-X: ${rec.gdsXUm} µm`, `GDS-Y: ${rec.gdsYUm} µm`];
+      const tipLines = [`Defect #${idx + 1}`];
+      if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);
+      tipLines.push(`GDS-X: ${rec.gdsXUm} µm`, `GDS-Y: ${rec.gdsYUm} µm`);
       for (const [k, v] of Object.entries(rec.raw)) tipLines.push(`${k}: ${v}`);
       const tipText = tipLines.join('\n');
       dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
@@ -546,7 +616,11 @@
 
       const row = document.createElement('div');
       row.className = 'defect-row';
-      let rowHtml = `<div><span class="k">GDS-X</span><span>${rec.gdsXUm} µm</span></div><div><span class="k">GDS-Y</span><span>${rec.gdsYUm} µm</span></div>`;
+      let rowHtml = '';
+      if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') {
+        rowHtml += `<div><span class="k">ECID</span><span>${escapeHtml(String(rec.ecid))}</span></div>`;
+      }
+      rowHtml += `<div><span class="k">GDS-X</span><span>${rec.gdsXUm} µm</span></div><div><span class="k">GDS-Y</span><span>${rec.gdsYUm} µm</span></div>`;
       for (const [k, v] of Object.entries(rec.raw)) {
         rowHtml += `<div><span class="k">${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></div>`;
       }

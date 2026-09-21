@@ -186,6 +186,8 @@ code { font-family: var(--font-mono); }
 .die-outline { fill: var(--bg-inset); stroke: var(--border-soft); stroke-width: 1.5; }
 .axis-line { stroke: var(--border-soft); stroke-width: 1; stroke-dasharray: 4 4; }
 .axis-label { fill: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }
+.tick-mark { stroke: var(--border-soft); stroke-width: 1; }
+.tick-label { font-size: 9px; }
 
 /* ===================== Tooltip ===================== */
 .tooltip {
