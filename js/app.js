@@ -62,6 +62,7 @@
   const sheetSelectField = el('sheetSelectField');
   const sheetSelect = el('sheetSelect');
   const csvError = el('csvError');
+  const csvSkippedNote = el('csvSkippedNote');
   const statsPanel = el('statsPanel');
   const statTotalDies = el('statTotalDies');
   const statUsableDies = el('statUsableDies');
@@ -153,6 +154,16 @@
     return null;
   }
 
+  // Number('') and Number('  ') both evaluate to 0, not NaN -- so a blank cell
+  // in a required numeric column would otherwise be silently treated as a real
+  // 0 value instead of being skipped as missing data.
+  function parseNumericCell(value) {
+    if (value === null || value === undefined) return NaN;
+    const trimmed = String(value).trim();
+    if (trimmed === '') return NaN;
+    return Number(trimmed);
+  }
+
   const BOM_SIGNATURES = [
     { bytes: [0xEF, 0xBB, 0xBF], encoding: 'utf-8', length: 3 },
     { bytes: [0xFF, 0xFE], encoding: 'utf-16le', length: 2 },
@@ -198,6 +209,7 @@
 
   async function handleFileSelected(file) {
     csvError.hidden = true;
+    csvSkippedNote.hidden = true;
     csvEncodingNote.textContent = '';
     const ext = fileExt(file);
     try {
@@ -303,13 +315,15 @@
     const extraCols = headers.filter((h) => !knownCols.has(h));
 
     const records = [];
+    let skippedCount = 0;
     for (const row of rows) {
-      const dieX = Number(row[dieXCol]);
-      const dieY = Number(row[dieYCol]);
-      const gdsXUm = Number(row[gdsXCol]);
-      const gdsYUm = Number(row[gdsYCol]);
+      const dieX = parseNumericCell(row[dieXCol]);
+      const dieY = parseNumericCell(row[dieYCol]);
+      const gdsXUm = parseNumericCell(row[gdsXCol]);
+      const gdsYUm = parseNumericCell(row[gdsYCol]);
       if (!Number.isFinite(dieX) || !Number.isFinite(dieY) || !Number.isFinite(gdsXUm) || !Number.isFinite(gdsYUm)) {
-        continue; // skip malformed rows
+        skippedCount++; // blank/non-numeric cell in a required column -- skip, don't treat as 0
+        continue;
       }
       const raw = {};
       for (const col of extraCols) raw[col] = row[col];
@@ -323,6 +337,14 @@
 
     if (!records.length) {
       throw new Error('No valid defect rows found in CSV.');
+    }
+
+    if (skippedCount > 0) {
+      csvSkippedNote.textContent =
+        `${skippedCount} row${skippedCount === 1 ? '' : 's'} skipped (blank or non-numeric die_X/die_Y/GDS-X/GDS-Y).`;
+      csvSkippedNote.hidden = false;
+    } else {
+      csvSkippedNote.hidden = true;
     }
 
     state.records = records;

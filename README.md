@@ -92,6 +92,10 @@ Any other columns (defect class, size, etc.) are preserved and shown in the
 defect tooltip and detail list in the die defect map — no fixed schema
 beyond the columns above.
 
+**Blank cells**: a row with a blank/empty `die_X`, `die_Y`, `GDS-X`, or
+`GDS-Y` cell is skipped rather than treated as `0` — a note below the file
+picker reports how many rows were skipped this way, if any.
+
 **Delimiters** (CSV/TSV/TXT only): comma, tab, semicolon and pipe are
 auto-detected — a `.csv`, `.tsv`, or plain `.txt` extension all work.
 
