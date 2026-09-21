@@ -315,16 +315,19 @@
     const extraCols = headers.filter((h) => !knownCols.has(h));
 
     const records = [];
-    let skippedCount = 0;
+    let skippedCount = 0;   // blank/invalid die_X or die_Y -- unusable anywhere, dropped entirely
+    let noGdsCount = 0;     // valid die_X/die_Y but blank/invalid GDS-X or GDS-Y
     for (const row of rows) {
       const dieX = parseNumericCell(row[dieXCol]);
       const dieY = parseNumericCell(row[dieYCol]);
-      const gdsXUm = parseNumericCell(row[gdsXCol]);
-      const gdsYUm = parseNumericCell(row[gdsYCol]);
-      if (!Number.isFinite(dieX) || !Number.isFinite(dieY) || !Number.isFinite(gdsXUm) || !Number.isFinite(gdsYUm)) {
-        skippedCount++; // blank/non-numeric cell in a required column -- skip, don't treat as 0
+      if (!Number.isFinite(dieX) || !Number.isFinite(dieY)) {
+        skippedCount++; // no die to attribute this row to -- can't count it anywhere
         continue;
       }
+      const gdsXUmRaw = parseNumericCell(row[gdsXCol]);
+      const gdsYUmRaw = parseNumericCell(row[gdsYCol]);
+      const hasGds = Number.isFinite(gdsXUmRaw) && Number.isFinite(gdsYUmRaw);
+      if (!hasGds) noGdsCount++;
       const raw = {};
       for (const col of extraCols) raw[col] = row[col];
       const ecid = ecidCol ? row[ecidCol] : null;
@@ -332,16 +335,33 @@
       // the die's own corner (die center sits at dieSize/2) -- not an offset from
       // the die center. Kept raw here; converted to a centered mm offset for
       // plotting wherever the die size is known (it can change after parsing).
-      records.push({ dieX, dieY, gdsXUm, gdsYUm, ecid, raw });
+      // A row with a valid die but blank/invalid GDS still counts toward the
+      // wafer map's per-die defect count -- it just can't be plotted as a dot
+      // in the die defect map (gdsXUm/gdsYUm are null when missing).
+      records.push({
+        dieX, dieY,
+        gdsXUm: hasGds ? gdsXUmRaw : null,
+        gdsYUm: hasGds ? gdsYUmRaw : null,
+        ecid, raw,
+      });
     }
 
     if (!records.length) {
       throw new Error('No valid defect rows found in CSV.');
     }
 
+    const noteParts = [];
     if (skippedCount > 0) {
-      csvSkippedNote.textContent =
-        `${skippedCount} row${skippedCount === 1 ? '' : 's'} skipped (blank or non-numeric die_X/die_Y/GDS-X/GDS-Y).`;
+      noteParts.push(`${skippedCount} row${skippedCount === 1 ? '' : 's'} skipped (blank/non-numeric die_X or die_Y).`);
+    }
+    if (noGdsCount > 0) {
+      noteParts.push(
+        `${noGdsCount} defect${noGdsCount === 1 ? '' : 's'} missing GDS-X/GDS-Y — ` +
+        `still counted on the wafer map, but not plotted in the die defect map.`
+      );
+    }
+    if (noteParts.length) {
+      csvSkippedNote.textContent = noteParts.join(' ');
       csvSkippedNote.hidden = false;
     } else {
       csvSkippedNote.hidden = true;
@@ -446,11 +466,13 @@
     let minY = Infinity;
     let maxY = -Infinity;
     for (const rec of state.records) {
+      if (rec.gdsXUm === null || rec.gdsYUm === null) continue; // no GDS location
       minX = Math.min(minX, rec.gdsXUm);
       maxX = Math.max(maxX, rec.gdsXUm);
       minY = Math.min(minY, rec.gdsYUm);
       maxY = Math.max(maxY, rec.gdsYUm);
     }
+    if (!Number.isFinite(minX)) return; // no defect had a GDS location to calibrate from
     readInputs();
     const baseCenterXUm = (state.dieSizeX * 1000) / 2;
     const baseCenterYUm = (state.dieSizeY * 1000) / 2;
@@ -747,23 +769,31 @@
     })).textContent = 'µm';
 
     defects.forEach((rec, idx) => {
-      // GDS-X/GDS-Y are absolute, corner-origin coordinates (die center = dieSize/2,
-      // nudged by the GDS Origin Offset calibration); convert to a centered mm
-      // offset for plotting against the centered die box.
-      const gdsXCenteredMm = (rec.gdsXUm - assumedCenterXUm) / 1000;
-      const gdsYCenteredMm = (rec.gdsYUm - assumedCenterYUm) / 1000;
-      const px = centerPx + gdsXCenteredMm * mmToPx;
-      const py = centerPx - gdsYCenteredMm * mmToPx;
-      const dot = svgEl('circle', { class: 'defect-dot', cx: px, cy: py, r: 5, 'data-idx': idx });
-      const tipLines = [`Defect #${idx + 1}`];
-      if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);
-      tipLines.push(`GDS-X: ${rec.gdsXUm} µm`, `GDS-Y: ${rec.gdsYUm} µm`);
-      for (const [k, v] of Object.entries(rec.raw)) tipLines.push(`${k}: ${v}`);
-      const tipText = tipLines.join('\n');
-      dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
-      dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
-      dot.addEventListener('mouseleave', hideTooltip);
-      dieSvg.appendChild(dot);
+      const hasGds = rec.gdsXUm !== null && rec.gdsYUm !== null;
+      const gdsXText = hasGds ? `${rec.gdsXUm} µm` : 'N/A';
+      const gdsYText = hasGds ? `${rec.gdsYUm} µm` : 'N/A';
+
+      // A defect with no GDS-X/GDS-Y (blank in the source file) can't be placed
+      // on the plot -- it's still listed below, just without a dot or position.
+      if (hasGds) {
+        // GDS-X/GDS-Y are absolute, corner-origin coordinates (die center =
+        // dieSize/2, nudged by the GDS Origin Offset calibration); convert to a
+        // centered mm offset for plotting against the centered die box.
+        const gdsXCenteredMm = (rec.gdsXUm - assumedCenterXUm) / 1000;
+        const gdsYCenteredMm = (rec.gdsYUm - assumedCenterYUm) / 1000;
+        const px = centerPx + gdsXCenteredMm * mmToPx;
+        const py = centerPx - gdsYCenteredMm * mmToPx;
+        const dot = svgEl('circle', { class: 'defect-dot', cx: px, cy: py, r: 5, 'data-idx': idx });
+        const tipLines = [`Defect #${idx + 1}`];
+        if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);
+        tipLines.push(`GDS-X: ${gdsXText}`, `GDS-Y: ${gdsYText}`);
+        for (const [k, v] of Object.entries(rec.raw)) tipLines.push(`${k}: ${v}`);
+        const tipText = tipLines.join('\n');
+        dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
+        dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
+        dot.addEventListener('mouseleave', hideTooltip);
+        dieSvg.appendChild(dot);
+      }
 
       const row = document.createElement('div');
       row.className = 'defect-row';
@@ -771,7 +801,10 @@
       if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') {
         rowHtml += `<div><span class="k">ECID</span><span>${escapeHtml(String(rec.ecid))}</span></div>`;
       }
-      rowHtml += `<div><span class="k">GDS-X</span><span>${rec.gdsXUm} µm</span></div><div><span class="k">GDS-Y</span><span>${rec.gdsYUm} µm</span></div>`;
+      rowHtml += `<div><span class="k">GDS-X</span><span>${gdsXText}</span></div><div><span class="k">GDS-Y</span><span>${gdsYText}</span></div>`;
+      if (!hasGds) {
+        rowHtml += `<div><span class="k">Note</span><span>not plotted (missing GDS)</span></div>`;
+      }
       for (const [k, v] of Object.entries(rec.raw)) {
         rowHtml += `<div><span class="k">${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></div>`;
       }
@@ -806,10 +839,14 @@
     if (!state.records.length) return null;
     let maxX = 0;
     let maxY = 0;
+    let sawGds = false;
     for (const rec of state.records) {
+      if (rec.gdsXUm === null || rec.gdsYUm === null) continue; // no GDS location to measure
+      sawGds = true;
       maxX = Math.max(maxX, Math.abs(rec.gdsXUm) / 1000);
       maxY = Math.max(maxY, Math.abs(rec.gdsYUm) / 1000);
     }
+    if (!sawGds) return null;
     const roundUpToHalf = (v) => Math.max(Math.ceil(v / 0.5) * 0.5, 0.5);
     return { minX: roundUpToHalf(maxX), minY: roundUpToHalf(maxY) };
   }

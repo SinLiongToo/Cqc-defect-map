@@ -92,9 +92,18 @@ Any other columns (defect class, size, etc.) are preserved and shown in the
 defect tooltip and detail list in the die defect map — no fixed schema
 beyond the columns above.
 
-**Blank cells**: a row with a blank/empty `die_X`, `die_Y`, `GDS-X`, or
-`GDS-Y` cell is skipped rather than treated as `0` — a note below the file
-picker reports how many rows were skipped this way, if any.
+**Blank cells**: a blank/empty numeric cell is never silently treated as
+`0`. The two coordinate pairs are handled independently:
+- A row with a blank/non-numeric `die_X` or `die_Y` can't be attributed to
+  any die, so it's dropped entirely — it won't appear on either map.
+- A row with valid `die_X`/`die_Y` but a blank/non-numeric `GDS-X` or
+  `GDS-Y` still counts toward that die's defect count on the **wafer map**
+  (color, hover, stats) — it's only excluded from being plotted as a dot on
+  the **die defect map**, where it instead appears in the defect list with
+  `N/A` and a "not plotted" note.
+
+A note below the file picker reports how many rows fell into each category,
+if any.
 
 **Delimiters** (CSV/TSV/TXT only): comma, tab, semicolon and pipe are
 auto-detected — a `.csv`, `.tsv`, or plain `.txt` extension all work.
