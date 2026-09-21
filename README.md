@@ -97,6 +97,20 @@ Everything runs in the browser — the file never leaves your machine.
   beside the chart. Always reflects every loaded defect regardless of
   what's selected on the wafer/die maps — it answers "what dominates
   overall," not "what's in the current selection."
+- **Trend chart**: sits beside the Pareto chart, counting defect rows per
+  calendar date. The **Date column** dropdown only offers columns whose
+  header contains "date" (case-insensitive) — if none exist, it's disabled
+  with an explanatory message instead of guessing. Values are parsed with
+  `new Date(...)`; a column with a time-of-day component is grouped down to
+  its calendar date (year-month-day) rather than treated as near-unique
+  per-row timestamps, and rows with a blank or unparseable date are excluded
+  from the line (with a count of how many, below the chart) rather than
+  breaking the timeline. Points are plotted in chronological order but only
+  for dates that actually appear in the data — gaps are **not** filled in as
+  zero, since the column's real time granularity (daily, weekly, per-lot...)
+  isn't known. Beyond 12 points, most x-axis text labels are thinned out to
+  stay legible; every point is still plotted and shows its exact date/count
+  on hover.
 - **Full view**: an icon on the die defect map's header opens it in a large
   modal (same live SVG and defect list, just reparented and sized bigger —
   no data or interactivity lost) for closer inspection of the defect
@@ -127,7 +141,9 @@ Everything runs in the browser — the file never leaves your machine.
    pattern at a larger size, or the help icon in the top bar for a
    walkthrough and the file format reference at any time.
 6. Scroll down to the **Pareto Chart** and pick any column from the
-   dropdown to see which of its values dominate across every loaded defect.
+   dropdown to see which of its values dominate across every loaded defect;
+   the **Trend Chart** beside it does the same over time, for any column
+   whose name contains "date".
 
 ## File format
 

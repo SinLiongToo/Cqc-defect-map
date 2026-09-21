@@ -60,6 +60,8 @@
     extraColumns: [],  // headers not recognized as dieX/dieY/gdsX/gdsY/ecid
     paretoColumns: [], // all headers, in file order, offered by the Pareto column select
     paretoColumn: null, // currently selected header for the Pareto chart
+    trendColumns: [],   // headers whose name contains "date" (case-insensitive), offered by the Trend chart
+    trendColumn: null,  // currently selected header for the Trend chart
   };
 
   function dieKey(x, y) { return `${x},${y}`; }
@@ -147,6 +149,10 @@
   const paretoSvg = el('paretoSvg');
   const paretoEmptyState = el('paretoEmptyState');
   const paretoList = el('paretoList');
+  const trendColumnSelect = el('trendColumnSelect');
+  const trendSvg = el('trendSvg');
+  const trendEmptyState = el('trendEmptyState');
+  const trendExcludedNote = el('trendExcludedNote');
 
   /* ===================== Modals ===================== */
   function openModal(modal) { modal.hidden = false; }
@@ -474,6 +480,7 @@
     }
     state.selectedDefects = new Set();
     populateParetoColumnSelect();
+    populateTrendColumnSelect();
     render();
     if (busiestKey) {
       const [bx, by] = busiestKey.split(',').map(Number);
@@ -519,6 +526,30 @@
   paretoColumnSelect.addEventListener('change', () => {
     state.paretoColumn = paretoColumnSelect.value;
     renderPareto();
+  });
+
+  // Rebuilds the Trend chart's date-column dropdown, scoped to only the
+  // headers whose name contains "date" (case-insensitive) -- unlike the
+  // Pareto column, this one can't offer every column, since a trend chart
+  // is meaningless without something date-like on its x-axis.
+  function populateTrendColumnSelect() {
+    const prev = state.trendColumn;
+    state.trendColumns = state.paretoColumns.filter((col) => col.toLowerCase().includes('date'));
+    trendColumnSelect.innerHTML = '';
+    for (const col of state.trendColumns) {
+      const opt = document.createElement('option');
+      opt.value = col;
+      opt.textContent = col;
+      trendColumnSelect.appendChild(opt);
+    }
+    trendColumnSelect.disabled = state.trendColumns.length === 0;
+    state.trendColumn = state.trendColumns.includes(prev) ? prev : (state.trendColumns[0] || null);
+    if (state.trendColumn) trendColumnSelect.value = state.trendColumn;
+  }
+
+  trendColumnSelect.addEventListener('change', () => {
+    state.trendColumn = trendColumnSelect.value;
+    renderTrend();
   });
 
   csvInput.addEventListener('change', (e) => {
@@ -1464,12 +1495,135 @@
     });
   }
 
+  /* ===================== Trend chart ===================== */
+  const TREND_VIEWBOX_W = 640;
+  const TREND_VIEWBOX_H = 380;
+  const TREND_MARGIN = { top: 20, right: 20, bottom: 70, left: 50 };
+  // Beyond this many plotted dates, most x-axis text labels are skipped (the
+  // points themselves are still all drawn) so long date ranges don't turn
+  // the axis into an illegible smear of overlapping text -- hovering a point
+  // still shows its exact date and count.
+  const TREND_MAX_LABELS = 12;
+
+  // Groups records by calendar date (year-month-day, in local time) parsed
+  // from the selected date-like column, and counts rows per date -- a
+  // column with a time-of-day component would otherwise produce a near-
+  // unique bucket per row instead of a usable daily trend. Rows whose value
+  // is blank or unparseable as a date are excluded (a trend line has no
+  // sensible place to put them), sorted chronologically ascending.
+  function computeTrendData() {
+    const counts = new Map();
+    let excluded = 0;
+    for (const rec of state.records) {
+      const raw = getColumnValue(rec, state.trendColumn);
+      if (raw === null || raw === undefined || String(raw).trim() === '') { excluded++; continue; }
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) { excluded++; continue; }
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const data = [...counts.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, count]) => ({ date, count }));
+    return { data, excluded };
+  }
+
+  function renderTrend() {
+    trendSvg.innerHTML = '';
+    trendExcludedNote.hidden = true;
+    if (!state.records.length || !state.trendColumn) {
+      trendEmptyState.textContent = state.records.length && !state.trendColumns.length
+        ? 'No column with "date" in its name was found in this file.'
+        : 'Upload a CSV with a date-like column to see a defect-count trend.';
+      trendEmptyState.hidden = false;
+      return;
+    }
+
+    const { data, excluded } = computeTrendData();
+    if (!data.length) {
+      trendEmptyState.textContent = `No valid dates found in column "${state.trendColumn}".`;
+      trendEmptyState.hidden = false;
+      return;
+    }
+    trendEmptyState.hidden = true;
+
+    const x0 = TREND_MARGIN.left;
+    const x1 = TREND_VIEWBOX_W - TREND_MARGIN.right;
+    const y0 = TREND_MARGIN.top;
+    const y1 = TREND_VIEWBOX_H - TREND_MARGIN.bottom;
+    const plotW = x1 - x0;
+    const plotH = y1 - y0;
+    const n = data.length;
+    const bandW = n > 1 ? plotW / (n - 1) : 0;
+
+    const rawMax = data.reduce((m, e) => Math.max(m, e.count), 0) || 1;
+    const step = niceStep(rawMax / 5);
+    const yMax = Math.ceil(rawMax / step) * step;
+
+    const frag = document.createDocumentFragment();
+
+    for (let v = 0; v <= yMax + 1e-9; v += step) {
+      const y = y1 - (v / yMax) * plotH;
+      frag.appendChild(svgEl('line', { class: 'grid-line', x1: x0, y1: y, x2: x1, y2: y }));
+      frag.appendChild(svgEl('line', { class: 'tick-mark', x1: x0 - 5, y1: y, x2: x0, y2: y }));
+      const label = svgEl('text', { class: 'axis-label tick-label', x: x0 - 8, y: y + 3, 'text-anchor': 'end' });
+      label.textContent = String(Math.round(v));
+      frag.appendChild(label);
+    }
+    frag.appendChild(svgEl('line', { class: 'tick-mark', x1: x0, y1: y0, x2: x0, y2: y1 }));
+    frag.appendChild(svgEl('line', { class: 'tick-mark', x1: x0, y1: y1, x2: x1, y2: y1 }));
+
+    // Only label every Nth point when there are many, to keep the axis
+    // readable -- but every point is still plotted and hoverable.
+    const labelStride = Math.max(1, Math.ceil(n / TREND_MAX_LABELS));
+
+    const points = data.map((entry, i) => {
+      const cx = n > 1 ? x0 + bandW * i : (x0 + x1) / 2;
+      const cy = y1 - (entry.count / yMax) * plotH;
+      return { ...entry, cx, cy };
+    });
+
+    const polyline = svgEl('polyline', {
+      class: 'trend-line', points: points.map((p) => `${p.cx},${p.cy}`).join(' '),
+    });
+    polyline.style.stroke = 'var(--accent)';
+    frag.appendChild(polyline);
+
+    points.forEach((p, i) => {
+      const tip = `${p.date}\nCount: ${p.count}`;
+      const dot = svgEl('circle', { class: 'trend-point', cx: p.cx, cy: p.cy, r: 3, fill: 'var(--accent)' });
+      dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tip));
+      dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tip));
+      dot.addEventListener('mouseleave', hideTooltip);
+      frag.appendChild(dot);
+
+      if (i % labelStride === 0 || i === n - 1) {
+        const xLabel = svgEl('text', {
+          class: 'axis-label tick-label', x: p.cx, y: y1 + 14, 'text-anchor': 'end',
+          transform: `rotate(-40 ${p.cx} ${y1 + 14})`,
+        });
+        xLabel.textContent = p.date;
+        xLabel.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tip));
+        xLabel.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tip));
+        xLabel.addEventListener('mouseleave', hideTooltip);
+        frag.appendChild(xLabel);
+      }
+    });
+
+    trendSvg.appendChild(frag);
+
+    if (excluded > 0) {
+      trendExcludedNote.textContent =
+        `${excluded} record${excluded === 1 ? '' : 's'} missing/unparseable "${state.trendColumn}" excluded from the trend.`;
+      trendExcludedNote.hidden = false;
+    }
+  }
+
   /* ===================== Render orchestration ===================== */
   function render() {
     renderWafer();
     updateDieSizeHint();
     if (state.records.length) renderDieDetail();
     renderPareto();
+    renderTrend();
   }
 
   /* ===================== Init ===================== */

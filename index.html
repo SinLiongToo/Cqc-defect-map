@@ -209,7 +209,7 @@
         </div>
       </section>
 
-      <section class="stage-card full-width-card" id="paretoCard">
+      <section class="stage-card" id="paretoCard">
         <div class="stage-header">
           <h2>Pareto Chart</h2>
           <label class="gds-calibration">
@@ -225,6 +225,22 @@
           </div>
           <div class="pareto-list" id="paretoList"></div>
         </div>
+      </section>
+
+      <section class="stage-card" id="trendCard">
+        <div class="stage-header">
+          <h2>Trend Chart</h2>
+          <label class="gds-calibration">
+            <span class="muted small">Date column</span>
+            <select id="trendColumnSelect" class="calib-input calib-select" disabled></select>
+          </label>
+        </div>
+        <p class="muted small stage-hint">Defect row count per date, using any loaded column whose name contains "date" — sorted chronologically, only showing dates that actually appear in the file (gaps aren't filled in as zero).</p>
+        <div class="trend-svg-wrap">
+          <svg id="trendSvg" viewBox="0 0 640 380" role="img" aria-label="Trend chart"></svg>
+          <p class="empty-state" id="trendEmptyState">Upload a CSV with a date-like column to see a defect-count trend.</p>
+        </div>
+        <p class="muted small" id="trendExcludedNote" hidden></p>
       </section>
     </main>
   </div>
@@ -258,6 +274,7 @@
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
           <li>The <strong>Pareto Chart</strong> below the two maps counts how often each value of any column occurs (pick it from the <strong>Column</strong> dropdown) — sorted most to least common, with a cumulative-% line and an 80% "vital few" cutoff. It always covers every loaded defect, independent of whatever's selected above.</li>
+          <li>The <strong>Trend Chart</strong> beside it counts defect rows per date, for any column whose name contains "date" — pick it from the <strong>Date column</strong> dropdown. Only dates that actually appear in the file are plotted (gaps aren't filled in as zero); rows with a blank or unparseable date are excluded and noted below the chart.</li>
         </ol>
 
         <h3>File format</h3>
