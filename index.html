@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CQC Defect Map — Wafer Viewer</title>
+<meta name="description" content="Client-side wafer defect map viewer: upload a defect CSV and visualize die-level and in-die defect locations." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22%2300e5ff%22/></svg>">
+</head>
+<body>
+
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div class="brand-text">
+        <h1>CQC Defect Map</h1>
+        <span class="brand-sub">Wafer &amp; Die Defect Viewer</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="sidebarToggle" class="icon-btn mobile-only" aria-label="Toggle controls" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+      </button>
+      <button id="themeToggle" class="icon-btn" aria-label="Toggle dark / light mode">
+        <svg id="themeIconMoon" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12.1 22a10 10 0 0 1-8.9-14.6 1 1 0 0 1 1.7-.2 7.6 7.6 0 0 0 10 10 1 1 0 0 1 1.5 1.3A10 10 0 0 1 12.1 22Z"/></svg>
+        <svg id="themeIconSun" viewBox="0 0 24 24" width="20" height="20" style="display:none"><path fill="currentColor" d="M12 4a1 1 0 0 1-1-1V1a1 1 0 0 1 2 0v2a1 1 0 0 1-1 1Zm0 19a1 1 0 0 1-1-1v-2a1 1 0 0 1 2 0v2a1 1 0 0 1-1 1ZM4 13H2a1 1 0 0 1 0-2h2a1 1 0 0 1 0 2Zm19 0h-2a1 1 0 0 1 0-2h2a1 1 0 0 1 0 2ZM6.2 7.6 4.8 6.2a1 1 0 1 1 1.4-1.4l1.4 1.4a1 1 0 1 1-1.4 1.4Zm11.6 11.6-1.4-1.4a1 1 0 1 1 1.4-1.4l1.4 1.4a1 1 0 0 1-1.4 1.4ZM17.8 7.6a1 1 0 0 1-1.4-1.4l1.4-1.4a1 1 0 1 1 1.4 1.4ZM6.2 19.2a1 1 0 0 1-1.4-1.4l1.4-1.4a1 1 0 0 1 1.4 1.4ZM12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <section class="panel">
+        <h2 class="panel-title">Wafer Setup</h2>
+
+        <label class="field">
+          <span>Wafer Size</span>
+          <select id="waferSize">
+            <option value="8">8 inch (200 mm)</option>
+            <option value="12" selected>12 inch (300 mm)</option>
+          </select>
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Die Size X (mm)</span>
+            <input type="number" id="dieSizeX" min="0.1" step="0.1" value="5" />
+          </label>
+          <label class="field">
+            <span>Die Size Y (mm)</span>
+            <input type="number" id="dieSizeY" min="0.1" step="0.1" value="5" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Notch Direction</span>
+          <select id="notchDir">
+            <option value="down" selected>Down</option>
+            <option value="right">Right</option>
+            <option value="up">Up</option>
+            <option value="left">Left</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">Defect CSV</h2>
+        <label class="dropzone" id="dropzone" for="csvInput">
+          <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.6l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L11 13.6V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+          <span id="dropzoneLabel">Click or drop CSV file</span>
+          <input type="file" id="csvInput" accept=".csv,text/csv" hidden />
+        </label>
+        <p id="csvFileName" class="muted small"></p>
+        <p id="csvError" class="error-text" hidden></p>
+      </section>
+
+      <section class="panel" id="statsPanel" hidden>
+        <h2 class="panel-title">Summary</h2>
+        <dl class="stats">
+          <div><dt>Dies on wafer</dt><dd id="statTotalDies">–</dd></div>
+          <div><dt>Dies w/ defects</dt><dd id="statDefectDies">–</dd></div>
+          <div><dt>Total defects</dt><dd id="statTotalDefects">–</dd></div>
+        </dl>
+        <div class="legend" id="legend"></div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">CSV Format</h2>
+        <p class="muted small">
+          Required columns (case-insensitive, flexible naming):
+        </p>
+        <ul class="small muted col-list">
+          <li><code>die_X</code> / <code>X coordinate</code></li>
+          <li><code>die_Y</code> / <code>Y coordinate</code></li>
+          <li><code>GDS-X</code></li>
+          <li><code>GDS-Y</code></li>
+        </ul>
+        <p class="muted small">Any extra columns are kept and shown in defect tooltips.</p>
+      </section>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <main class="content">
+      <section class="stage-card">
+        <div class="stage-header">
+          <h2>Wafer Map</h2>
+          <span class="muted small">Hover a die for its coordinate · click a die to inspect defects</span>
+        </div>
+        <div class="wafer-stage" id="waferStage">
+          <svg id="waferSvg" viewBox="0 0 640 640" role="img" aria-label="Wafer map"></svg>
+          <p class="empty-state" id="waferEmptyState">Set wafer/die parameters, then upload a CSV to render the wafer map.</p>
+        </div>
+      </section>
+
+      <section class="stage-card" id="dieCard" hidden>
+        <div class="stage-header">
+          <h2>Die Inspector — <span id="dieCardTitle">–</span></h2>
+          <button class="text-btn" id="closeDieCard">Close ✕</button>
+        </div>
+        <div class="die-stage">
+          <svg id="dieSvg" viewBox="0 0 480 480" role="img" aria-label="Die defect map"></svg>
+          <div class="die-defect-list" id="dieDefectList"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="app-footer">
+    <span class="muted small">Runs entirely in your browser — no data leaves your machine.</span>
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
