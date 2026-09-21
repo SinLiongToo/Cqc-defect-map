@@ -196,6 +196,7 @@ code { font-family: var(--font-mono); }
   border-radius: 8px; padding: 6px 8px; font-family: var(--font-mono); font-size: 12px; outline: none;
 }
 .calib-input:focus { border-color: var(--accent); }
+.calib-select { width: auto; min-width: 68px; cursor: pointer; }
 
 .wafer-stage { position: relative; display: flex; justify-content: center; }
 #waferSvg { width: 100%; max-width: 640px; height: auto; }
@@ -232,6 +233,7 @@ code { font-family: var(--font-mono); }
 .axis-line { stroke: var(--border-soft); stroke-width: 1; stroke-dasharray: 4 4; }
 .axis-label { fill: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }
 .tick-mark { stroke: var(--border-soft); stroke-width: 1; }
+.grid-line { stroke: var(--border-soft); stroke-width: 0.75; opacity: 0.5; }
 .tick-label { font-size: 9px; }
 
 /* ===================== Tooltip ===================== */

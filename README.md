@@ -29,18 +29,21 @@ Everything runs in the browser — the file never leaves your machine.
   if present, and edge-exclusion status
 - **Die defect map**: a composite view plotting *every* defect from *every*
   die at its exact (GDS-X, GDS-Y) absolute coordinate, in the shared
-  die-local coordinate system (all dies use the same Die Size), with a
-  ruler (tick marks + µm labels, in absolute coordinates matching the
-  tooltips) on both axes — useful for spotting systematic vs. random defect
-  clustering across the whole wafer. Click a die on the wafer map — or a
-  dot on the composite plot itself, from any die — to highlight that die's
-  own points (larger, full color) against everything else (small, dimmed)
-  and sync the highlight back to the wafer map; the defect list to the
-  right of the plot stays scoped to the highlighted die, with its own
-  hover tooltips. Starts
-  auto-highlighted on the die with the most defects; "Clear selection"
-  drops the highlight but keeps the composite plot visible. The two maps
-  sit side by side on wide screens (≥1200px) and stack on narrower ones
+  die-local coordinate system (all dies use the same Die Size), with grid
+  lines and a ruler (tick marks + µm labels, in absolute coordinates
+  matching the tooltips) on both axes — useful for spotting systematic vs.
+  random defect clustering across the whole wafer. Click a die on the
+  wafer map — or a dot on the composite plot itself, from any die — to
+  highlight that die's own points (larger, full color) against everything
+  else (small, dimmed) and sync the highlight back to the wafer map; the
+  defect list to the right of the plot stays scoped to the highlighted
+  die, with its own hover tooltips. Starts auto-highlighted on the die
+  with the most defects; "Clear selection" drops the highlight but keeps
+  the composite plot visible. A **Rotation** control (0°/90°/180°/270°)
+  spins the whole plot to match a die's actual physical orientation —
+  grid, ticks, and dots rotate together while labels stay upright. The
+  two maps sit side by side on wide screens (≥1200px) and stack on
+  narrower ones
 - On wide screens, side-by-side maps means the die defect map's own plot +
   list also stack (rather than sitting side by side) between ~1200–1599px,
   where there isn't room for both; at ≥1600px there's room for everything

@@ -29,6 +29,7 @@
     centerOffsetY: 0,
     gdsOffsetXUm: 0,
     gdsOffsetYUm: 0,
+    dieRotationDeg: 0,
     notch: 'down',
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
@@ -82,6 +83,7 @@
   const gdsOffsetXInput = el('gdsOffsetX');
   const gdsOffsetYInput = el('gdsOffsetY');
   const autoCalibrateGdsBtn = el('autoCalibrateGdsBtn');
+  const dieRotationSel = el('dieRotation');
   const tooltip = el('tooltip');
   const themeToggle = el('themeToggle');
   const themeIconMoon = el('themeIconMoon');
@@ -458,11 +460,12 @@
     state.centerOffsetY = Math.round(Number(centerOffsetYInput.value) || 0);
     state.gdsOffsetXUm = Math.round(Number(gdsOffsetXInput.value) || 0);
     state.gdsOffsetYUm = Math.round(Number(gdsOffsetYInput.value) || 0);
+    state.dieRotationDeg = Number(dieRotationSel.value) || 0;
     state.notch = notchSel.value;
   }
   [
     waferSizeSel, dieSizeXInput, dieSizeYInput, scribeLaneInput, edgeExclusionInput,
-    centerOffsetXInput, centerOffsetYInput, gdsOffsetXInput, gdsOffsetYInput, notchSel,
+    centerOffsetXInput, centerOffsetYInput, gdsOffsetXInput, gdsOffsetYInput, dieRotationSel, notchSel,
   ].forEach((input) => {
     input.addEventListener('change', () => { readInputs(); render(); });
   });
@@ -751,26 +754,27 @@
     const dieW = state.dieSizeX * mmToPx;
     const dieH = state.dieSizeY * mmToPx;
 
-    dieSvg.appendChild(svgEl('rect', {
+    // The whole plot (outline, grid, ticks, dots) rotates as one rigid group so
+    // the composite view can be reoriented to match a die's actual physical
+    // placement. Text labels counter-rotate individually (around their own
+    // position) so they stay upright and readable at any rotation.
+    const rotationDeg = state.dieRotationDeg || 0;
+    const group = svgEl('g', rotationDeg ? { transform: `rotate(${rotationDeg} ${centerPx} ${centerPx})` } : {});
+    function textEl(attrs) {
+      const node = svgEl('text', attrs);
+      if (rotationDeg) node.setAttribute('transform', `rotate(${-rotationDeg} ${attrs.x} ${attrs.y})`);
+      return node;
+    }
+
+    group.appendChild(svgEl('rect', {
       class: 'die-outline',
       x: centerPx - dieW / 2, y: centerPx - dieH / 2, width: dieW, height: dieH,
     }));
-    dieSvg.appendChild(svgEl('line', {
-      class: 'axis-line', x1: centerPx - dieW / 2, y1: centerPx, x2: centerPx + dieW / 2, y2: centerPx,
-    }));
-    dieSvg.appendChild(svgEl('line', {
-      class: 'axis-line', x1: centerPx, y1: centerPx - dieH / 2, x2: centerPx, y2: centerPx + dieH / 2,
-    }));
-    dieSvg.appendChild(svgEl('text', {
-      class: 'axis-label', x: centerPx + dieW / 2 - 4, y: centerPx - 6, 'text-anchor': 'end',
-    })).textContent = `+X`;
-    dieSvg.appendChild(svgEl('text', {
-      class: 'axis-label', x: centerPx + 6, y: centerPx - dieH / 2 + 10,
-    })).textContent = `+Y`;
 
-    // Ruler: tick marks + um labels along both axes, spaced at a "nice" round interval.
-    // The assumed center (where GDS-X/Y = dieSize/2 normally lands) can be nudged by
-    // the GDS Origin Offset calibration, to correct a systematic measurement bias.
+    // Ruler: grid lines + tick marks + um labels along both axes, spaced at a
+    // "nice" round interval. The assumed center (where GDS-X/Y = dieSize/2
+    // normally lands) can be nudged by the GDS Origin Offset calibration, to
+    // correct a systematic measurement bias.
     const halfWidthUm = halfMmX * 1000;
     const halfHeightUm = halfMmY * 1000;
     const assumedCenterXUm = halfWidthUm + state.gdsOffsetXUm;
@@ -783,10 +787,13 @@
     for (let vUm = stepUm; vUm <= halfWidthUm + 1e-6; vUm += stepUm) {
       for (const sign of [1, -1]) {
         const tx = centerPx + sign * vUm * pxPerUm;
-        dieSvg.appendChild(svgEl('line', {
+        group.appendChild(svgEl('line', {
+          class: 'grid-line', x1: tx, y1: centerPx - dieH / 2, x2: tx, y2: centerPx + dieH / 2,
+        }));
+        group.appendChild(svgEl('line', {
           class: 'tick-mark', x1: tx, y1: centerPx - TICK_LEN, x2: tx, y2: centerPx + TICK_LEN,
         }));
-        dieSvg.appendChild(svgEl('text', {
+        group.appendChild(textEl({
           class: 'axis-label tick-label', x: tx, y: centerPx + TICK_LEN + 11, 'text-anchor': 'middle',
         // Label with the absolute GDS-X value (origin at the die's corner,
         // adjusted by any calibration offset), matching the raw tooltip value.
@@ -796,15 +803,32 @@
     for (let vUm = stepUm; vUm <= halfHeightUm + 1e-6; vUm += stepUm) {
       for (const sign of [1, -1]) {
         const ty = centerPx - sign * vUm * pxPerUm;
-        dieSvg.appendChild(svgEl('line', {
+        group.appendChild(svgEl('line', {
+          class: 'grid-line', x1: centerPx - dieW / 2, y1: ty, x2: centerPx + dieW / 2, y2: ty,
+        }));
+        group.appendChild(svgEl('line', {
           class: 'tick-mark', x1: centerPx - TICK_LEN, y1: ty, x2: centerPx + TICK_LEN, y2: ty,
         }));
-        dieSvg.appendChild(svgEl('text', {
+        group.appendChild(textEl({
           class: 'axis-label tick-label', x: centerPx - TICK_LEN - 4, y: ty + 3, 'text-anchor': 'end',
         })).textContent = `${Math.round(assumedCenterYUm + sign * vUm)}`;
       }
     }
-    dieSvg.appendChild(svgEl('text', {
+
+    // Center crosshair (the die's own axes), drawn over the grid lines.
+    group.appendChild(svgEl('line', {
+      class: 'axis-line', x1: centerPx - dieW / 2, y1: centerPx, x2: centerPx + dieW / 2, y2: centerPx,
+    }));
+    group.appendChild(svgEl('line', {
+      class: 'axis-line', x1: centerPx, y1: centerPx - dieH / 2, x2: centerPx, y2: centerPx + dieH / 2,
+    }));
+    group.appendChild(textEl({
+      class: 'axis-label', x: centerPx + dieW / 2 - 4, y: centerPx - 6, 'text-anchor': 'end',
+    })).textContent = `+X`;
+    group.appendChild(textEl({
+      class: 'axis-label', x: centerPx + 6, y: centerPx - dieH / 2 + 10,
+    })).textContent = `+Y`;
+    group.appendChild(textEl({
       class: 'axis-label tick-label', x: centerPx - dieW / 2 + 4, y: centerPx - dieH / 2 + 12,
     })).textContent = 'µm';
 
@@ -840,8 +864,10 @@
       dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
       dot.addEventListener('mouseleave', hideTooltip);
       dot.addEventListener('click', () => selectDie(rec.dieX, rec.dieY));
-      dieSvg.appendChild(dot);
+      group.appendChild(dot);
     }
+
+    dieSvg.appendChild(group);
 
     // Defect list stays scoped to the selected die only.
     if (!hasSelection) {
