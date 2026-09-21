@@ -83,6 +83,20 @@ Everything runs in the browser — the file never leaves your machine.
   offset fields by hand releases that lock. Tooltips and the ruler still
   show/label the real values from the file; only the plotted position
   shifts.
+- **Pareto chart**: a full-width chart below the two maps that counts how
+  often each value of *any* loaded column occurs — pick the column from the
+  **Column** dropdown (every die_X/die_Y/GDS-X/GDS-Y/ECID field plus every
+  extra column in the file is offered; defaults to the first extra column,
+  since that's most often a defect classification). Bars are sorted most-
+  to-least common with a cumulative-percentage line overlaid, and a dashed
+  80% reference line marks the classic "vital few" cutoff — bars up to that
+  point are highlighted, the rest dimmed. Beyond 15 distinct values the tail
+  is collapsed into a single "Others (N values)" bucket so the chart and its
+  labels stay readable; hovering a bar (or its label) shows the exact count,
+  percentage, and cumulative percentage, and the same numbers are listed
+  beside the chart. Always reflects every loaded defect regardless of
+  what's selected on the wafer/die maps — it answers "what dominates
+  overall," not "what's in the current selection."
 - **Full view**: an icon on the die defect map's header opens it in a large
   modal (same live SVG and defect list, just reparented and sized bigger —
   no data or interactivity lost) for closer inspection of the defect
@@ -112,6 +126,8 @@ Everything runs in the browser — the file never leaves your machine.
 5. Click the full-view icon on the die defect map's header to inspect the
    pattern at a larger size, or the help icon in the top bar for a
    walkthrough and the file format reference at any time.
+6. Scroll down to the **Pareto Chart** and pick any column from the
+   dropdown to see which of its values dominate across every loaded defect.
 
 ## File format
 

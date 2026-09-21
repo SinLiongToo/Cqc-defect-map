@@ -52,6 +52,14 @@
     selectedDefects: new Set(), // Set of recId numbers
     rawBytes: null,         // Uint8Array of the last-loaded text file, kept for re-decoding on encoding change
     workbook: null,         // SheetJS workbook, kept for re-parsing on sheet change (xlsx/xls only)
+    // Maps the fixed record fields back to the original CSV/XLSX header they
+    // came from, so the Pareto column picker (and getColumnValue) can offer
+    // and read ANY loaded column -- not just the free-form "extra" ones --
+    // using the same header names the file actually had.
+    columnMap: { dieX: null, dieY: null, gdsX: null, gdsY: null, ecid: null },
+    extraColumns: [],  // headers not recognized as dieX/dieY/gdsX/gdsY/ecid
+    paretoColumns: [], // all headers, in file order, offered by the Pareto column select
+    paretoColumn: null, // currently selected header for the Pareto chart
   };
 
   function dieKey(x, y) { return `${x},${y}`; }
@@ -135,6 +143,10 @@
   const fullViewModal = el('fullViewModal');
   const fullViewBody = el('fullViewBody');
   const closeFullView = el('closeFullView');
+  const paretoColumnSelect = el('paretoColumnSelect');
+  const paretoSvg = el('paretoSvg');
+  const paretoEmptyState = el('paretoEmptyState');
+  const paretoList = el('paretoList');
 
   /* ===================== Modals ===================== */
   function openModal(modal) { modal.hidden = false; }
@@ -387,6 +399,10 @@
     const knownCols = new Set([dieXCol, dieYCol, gdsXCol, gdsYCol, ecidCol].filter(Boolean));
     const extraCols = headers.filter((h) => !knownCols.has(h));
 
+    state.columnMap = { dieX: dieXCol, dieY: dieYCol, gdsX: gdsXCol, gdsY: gdsYCol, ecid: ecidCol };
+    state.extraColumns = extraCols;
+    state.paretoColumns = [dieXCol, dieYCol, gdsXCol, gdsYCol, ...(ecidCol ? [ecidCol] : []), ...extraCols];
+
     const records = [];
     let skippedCount = 0;   // blank/invalid die_X or die_Y -- unusable anywhere, dropped entirely
     let noGdsCount = 0;     // valid die_X/die_Y but blank/invalid GDS-X or GDS-Y
@@ -457,12 +473,53 @@
       if (defects.length > busiestCount) { busiestCount = defects.length; busiestKey = key; }
     }
     state.selectedDefects = new Set();
+    populateParetoColumnSelect();
     render();
     if (busiestKey) {
       const [bx, by] = busiestKey.split(',').map(Number);
       selectDie(bx, by);
     }
   }
+
+  // Rebuilds the Pareto column dropdown from the just-parsed file's headers.
+  // Keeps the previous column selected across a reload if it still exists
+  // (e.g. re-uploading a corrected version of the same file); otherwise
+  // falls back to the first "extra" column, since that's most likely to hold
+  // a categorical defect classification -- die index / GDS coordinates /
+  // ECID are technically selectable too, but rarely what someone actually
+  // wants a Pareto breakdown of.
+  function populateParetoColumnSelect() {
+    const prev = state.paretoColumn;
+    paretoColumnSelect.innerHTML = '';
+    for (const col of state.paretoColumns) {
+      const opt = document.createElement('option');
+      opt.value = col;
+      opt.textContent = col;
+      paretoColumnSelect.appendChild(opt);
+    }
+    paretoColumnSelect.disabled = false;
+    const fallback = state.extraColumns[0] || state.columnMap.ecid || state.columnMap.dieX;
+    state.paretoColumn = state.paretoColumns.includes(prev) ? prev : fallback;
+    paretoColumnSelect.value = state.paretoColumn;
+  }
+
+  // Reads a record's value for any loaded column, whether it's one of the
+  // fixed fields (die_X, die_Y, GDS-X, GDS-Y, ECID) or a free-form "extra"
+  // column -- the Pareto chart lets the user pick any of them.
+  function getColumnValue(rec, colKey) {
+    const map = state.columnMap;
+    if (colKey === map.dieX) return rec.dieX;
+    if (colKey === map.dieY) return rec.dieY;
+    if (colKey === map.gdsX) return rec.gdsXUm;
+    if (colKey === map.gdsY) return rec.gdsYUm;
+    if (colKey === map.ecid) return rec.ecid;
+    return rec.raw[colKey];
+  }
+
+  paretoColumnSelect.addEventListener('change', () => {
+    state.paretoColumn = paretoColumnSelect.value;
+    renderPareto();
+  });
 
   csvInput.addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1237,11 +1294,182 @@
     render();
   });
 
+  /* ===================== Pareto chart ===================== */
+  // Beyond this many distinct values, the tail is collapsed into a single
+  // "Others" bucket -- a column like a raw coordinate can have hundreds of
+  // near-unique values, and a bar per value would make the chart unreadable
+  // (and its labels illegible) without actually adding insight.
+  const PARETO_MAX_CATEGORIES = 15;
+  const PARETO_VIEWBOX_W = 640;
+  const PARETO_VIEWBOX_H = 380;
+  const PARETO_MARGIN = { top: 20, right: 54, bottom: 100, left: 50 };
+
+  // Counts how often each value of the selected column occurs, sorted most-
+  // to-least common, with a running cumulative percentage -- the two things
+  // a Pareto chart needs. Independent of any die/defect selection on the two
+  // maps: it always summarizes every loaded record, since narrowing it to
+  // "just what's currently selected" would make it answer a different
+  // question (this selection's makeup) than a Pareto chart is for (what
+  // dominates across the whole dataset).
+  function computeParetoData() {
+    const counts = new Map();
+    for (const rec of state.records) {
+      const raw = getColumnValue(rec, state.paretoColumn);
+      const label = (raw === null || raw === undefined || String(raw).trim() === '') ? '(blank)' : String(raw);
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+    let entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    if (entries.length > PARETO_MAX_CATEGORIES) {
+      const top = entries.slice(0, PARETO_MAX_CATEGORIES - 1);
+      const rest = entries.slice(PARETO_MAX_CATEGORIES - 1);
+      const othersCount = rest.reduce((sum, [, c]) => sum + c, 0);
+      top.push([`Others (${rest.length} values)`, othersCount]);
+      entries = top;
+    }
+    const total = state.records.length;
+    let running = 0;
+    return entries.map(([label, count]) => {
+      running += count;
+      return { label, count, pct: (count / total) * 100, cumPct: (running / total) * 100 };
+    });
+  }
+
+  function renderPareto() {
+    paretoSvg.innerHTML = '';
+    if (!state.records.length || !state.paretoColumn) {
+      paretoEmptyState.hidden = false;
+      paretoList.innerHTML = '';
+      return;
+    }
+    paretoEmptyState.hidden = true;
+
+    const data = computeParetoData();
+    const x0 = PARETO_MARGIN.left;
+    const x1 = PARETO_VIEWBOX_W - PARETO_MARGIN.right;
+    const y0 = PARETO_MARGIN.top;
+    const y1 = PARETO_VIEWBOX_H - PARETO_MARGIN.bottom;
+    const plotW = x1 - x0;
+    const plotH = y1 - y0;
+    const n = data.length;
+    const bandW = plotW / n;
+    const barW = Math.min(bandW * 0.55, 48);
+
+    const rawMax = data.reduce((m, e) => Math.max(m, e.count), 0) || 1;
+    const step = niceStep(rawMax / 5);
+    const yMax = Math.ceil(rawMax / step) * step;
+
+    // First bar whose cumulative % reaches the classic Pareto 80% cutoff --
+    // marks the "vital few" categories that account for most of the count.
+    const cutoffIndex = data.findIndex((e) => e.cumPct >= 80);
+
+    const frag = document.createDocumentFragment();
+
+    // Left axis: absolute count, gridlines + ticks at a "nice" interval.
+    for (let v = 0; v <= yMax + 1e-9; v += step) {
+      const y = y1 - (v / yMax) * plotH;
+      frag.appendChild(svgEl('line', { class: 'grid-line', x1: x0, y1: y, x2: x1, y2: y }));
+      frag.appendChild(svgEl('line', { class: 'tick-mark', x1: x0 - 5, y1: y, x2: x0, y2: y }));
+      const label = svgEl('text', { class: 'axis-label tick-label', x: x0 - 8, y: y + 3, 'text-anchor': 'end' });
+      label.textContent = String(Math.round(v));
+      frag.appendChild(label);
+    }
+
+    // Right axis: cumulative percentage, fixed 0-100% in steps of 20. The 80%
+    // tick is skipped here and drawn separately below, in the cutoff-line's
+    // own warning color, so the two don't render as an overlapping duplicate
+    // "80%" label at the same y position.
+    for (let p = 0; p <= 100; p += 20) {
+      if (p === 80) continue;
+      const y = y1 - (p / 100) * plotH;
+      frag.appendChild(svgEl('line', { class: 'tick-mark', x1: x1, y1: y, x2: x1 + 5, y2: y }));
+      const label = svgEl('text', { class: 'axis-label tick-label', x: x1 + 8, y: y + 3, 'text-anchor': 'start' });
+      label.textContent = `${p}%`;
+      frag.appendChild(label);
+    }
+
+    // 80% reference line, so the "vital few" cutoff is visible at a glance,
+    // not just implied by the bar coloring.
+    const y80 = y1 - (80 / 100) * plotH;
+    frag.appendChild(svgEl('line', { class: 'axis-line pareto-cutoff-line', x1: x0, y1: y80, x2: x1, y2: y80 }));
+    frag.appendChild(svgEl('line', { class: 'tick-mark pareto-cutoff-line', x1: x1, y1: y80, x2: x1 + 5, y2: y80 }));
+    const cutoffLabel = svgEl('text', {
+      class: 'axis-label tick-label pareto-cutoff-label', x: x1 + 8, y: y80 + 3, 'text-anchor': 'start',
+    });
+    cutoffLabel.textContent = '80%';
+    frag.appendChild(cutoffLabel);
+
+    frag.appendChild(svgEl('line', { class: 'tick-mark', x1: x0, y1: y0, x2: x0, y2: y1 }));
+    frag.appendChild(svgEl('line', { class: 'tick-mark', x1: x0, y1: y1, x2: x1, y2: y1 }));
+
+    const linePoints = [];
+
+    data.forEach((entry, i) => {
+      const cx = x0 + bandW * (i + 0.5);
+      const barH = (entry.count / yMax) * plotH;
+      const by = y1 - barH;
+      // "Vital few" bars (up through the 80% cumulative cutoff) are drawn in
+      // the accent color; the "trivial many" tail is dimmed, same visual
+      // language as the die defect map's selected-vs-dimmed dots.
+      const vital = i <= cutoffIndex;
+      const bar = svgEl('rect', {
+        class: 'pareto-bar', x: cx - barW / 2, y: by, width: barW, height: Math.max(barH, 0.5),
+        fill: vital ? 'var(--accent-2)' : 'var(--text-muted)', opacity: vital ? 0.9 : 0.45,
+      });
+      const tip = `${entry.label}\nCount: ${entry.count} (${entry.pct.toFixed(1)}%)\nCumulative: ${entry.cumPct.toFixed(1)}%`;
+      bar.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tip));
+      bar.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tip));
+      bar.addEventListener('mouseleave', hideTooltip);
+      frag.appendChild(bar);
+
+      const labelText = entry.label.length > 16 ? `${entry.label.slice(0, 14)}…` : entry.label;
+      const xLabel = svgEl('text', {
+        class: 'axis-label tick-label', x: cx, y: y1 + 14, 'text-anchor': 'end',
+        transform: `rotate(-40 ${cx} ${y1 + 14})`,
+      });
+      xLabel.textContent = labelText;
+      xLabel.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tip));
+      xLabel.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tip));
+      xLabel.addEventListener('mouseleave', hideTooltip);
+      frag.appendChild(xLabel);
+
+      linePoints.push([cx, y1 - (entry.cumPct / 100) * plotH, tip]);
+    });
+
+    // Cumulative-% line, drawn over the bars.
+    const polyline = svgEl('polyline', {
+      class: 'pareto-line', points: linePoints.map(([px, py]) => `${px},${py}`).join(' '),
+    });
+    polyline.style.stroke = 'var(--accent)';
+    frag.appendChild(polyline);
+
+    linePoints.forEach(([px, py, tip]) => {
+      const dot = svgEl('circle', { class: 'pareto-point', cx: px, cy: py, r: 3, fill: 'var(--accent)' });
+      dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tip));
+      dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tip));
+      dot.addEventListener('mouseleave', hideTooltip);
+      frag.appendChild(dot);
+    });
+
+    paretoSvg.appendChild(frag);
+
+    paretoList.innerHTML = '';
+    data.forEach((entry, i) => {
+      const row = document.createElement('div');
+      row.className = 'pareto-row' + (i <= cutoffIndex ? ' vital' : '');
+      row.innerHTML = `
+        <div class="pareto-row-head"><span>#${i + 1} ${escapeHtml(entry.label)}</span><span>${entry.count}</span></div>
+        <div class="pareto-row-sub"><span>${entry.pct.toFixed(1)}% of total</span><span>Cum ${entry.cumPct.toFixed(1)}%</span></div>
+      `;
+      paretoList.appendChild(row);
+    });
+  }
+
   /* ===================== Render orchestration ===================== */
   function render() {
     renderWafer();
     updateDieSizeHint();
     if (state.records.length) renderDieDetail();
+    renderPareto();
   }
 
   /* ===================== Init ===================== */

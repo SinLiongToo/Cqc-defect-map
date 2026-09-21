@@ -208,6 +208,24 @@
           <div class="die-defect-list" id="dieDefectList"></div>
         </div>
       </section>
+
+      <section class="stage-card full-width-card" id="paretoCard">
+        <div class="stage-header">
+          <h2>Pareto Chart</h2>
+          <label class="gds-calibration">
+            <span class="muted small">Column</span>
+            <select id="paretoColumnSelect" class="calib-input calib-select" disabled></select>
+          </label>
+        </div>
+        <p class="muted small stage-hint">Counts how often each value of the chosen column occurs across every loaded defect, sorted most to least common, with a cumulative-percentage line marking the classic 80% cutoff.</p>
+        <div class="pareto-stage" id="paretoStage">
+          <div class="pareto-svg-wrap">
+            <svg id="paretoSvg" viewBox="0 0 640 380" role="img" aria-label="Pareto chart"></svg>
+            <p class="empty-state" id="paretoEmptyState">Upload a CSV to see a Pareto breakdown by any column.</p>
+          </div>
+          <div class="pareto-list" id="paretoList"></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -239,6 +257,7 @@
           <li>Hover a die on the wafer map for its coordinate. Clicking a wafer die highlights its <em>entire</em> set of defects; clicking a dot on the die defect map highlights just that <em>one</em> defect. Ctrl/Cmd/Shift-click, or -drag a box, on either map to add more to the selection; click empty space to clear it.</li>
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
+          <li>The <strong>Pareto Chart</strong> below the two maps counts how often each value of any column occurs (pick it from the <strong>Column</strong> dropdown) — sorted most to least common, with a cumulative-% line and an 80% "vital few" cutoff. It always covers every loaded defect, independent of whatever's selected above.</li>
         </ol>
 
         <h3>File format</h3>
