@@ -27,6 +27,8 @@
     edgeExclusionMm: 3,
     centerOffsetX: 0,
     centerOffsetY: 0,
+    gdsOffsetXUm: 0,
+    gdsOffsetYUm: 0,
     notch: 'down',
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
@@ -76,6 +78,9 @@
   const DIE_EMPTY_DEFAULT_TEXT = dieEmptyState.textContent;
   const dieDefectList = el('dieDefectList');
   const closeDieCard = el('closeDieCard');
+  const gdsOffsetXInput = el('gdsOffsetX');
+  const gdsOffsetYInput = el('gdsOffsetY');
+  const autoCalibrateGdsBtn = el('autoCalibrateGdsBtn');
   const tooltip = el('tooltip');
   const themeToggle = el('themeToggle');
   const themeIconMoon = el('themeIconMoon');
@@ -376,11 +381,13 @@
     state.edgeExclusionMm = Math.max(0, Number(edgeExclusionInput.value) || 0);
     state.centerOffsetX = Math.round(Number(centerOffsetXInput.value) || 0);
     state.centerOffsetY = Math.round(Number(centerOffsetYInput.value) || 0);
+    state.gdsOffsetXUm = Math.round(Number(gdsOffsetXInput.value) || 0);
+    state.gdsOffsetYUm = Math.round(Number(gdsOffsetYInput.value) || 0);
     state.notch = notchSel.value;
   }
   [
     waferSizeSel, dieSizeXInput, dieSizeYInput, scribeLaneInput, edgeExclusionInput,
-    centerOffsetXInput, centerOffsetYInput, notchSel,
+    centerOffsetXInput, centerOffsetYInput, gdsOffsetXInput, gdsOffsetYInput, notchSel,
   ].forEach((input) => {
     input.addEventListener('change', () => { readInputs(); render(); });
   });
@@ -403,6 +410,32 @@
     state.centerOffsetY = Math.round((minY + maxY) / 2) - maxJ;
     centerOffsetXInput.value = state.centerOffsetX;
     centerOffsetYInput.value = state.centerOffsetY;
+    render();
+  });
+
+  // GDS Origin Offset: like the wafer map's auto-center, but for the die
+  // defect map -- nudges the assumed die center (normally dieSize/2) so that
+  // the midpoint of all loaded defects' GDS-X/GDS-Y lines up with it, correcting
+  // a systematic calibration bias in the inspection tool's coordinate output.
+  autoCalibrateGdsBtn.addEventListener('click', () => {
+    if (!state.records.length) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const rec of state.records) {
+      minX = Math.min(minX, rec.gdsXUm);
+      maxX = Math.max(maxX, rec.gdsXUm);
+      minY = Math.min(minY, rec.gdsYUm);
+      maxY = Math.max(maxY, rec.gdsYUm);
+    }
+    readInputs();
+    const baseCenterXUm = (state.dieSizeX * 1000) / 2;
+    const baseCenterYUm = (state.dieSizeY * 1000) / 2;
+    state.gdsOffsetXUm = Math.round((minX + maxX) / 2 - baseCenterXUm);
+    state.gdsOffsetYUm = Math.round((minY + maxY) / 2 - baseCenterYUm);
+    gdsOffsetXInput.value = state.gdsOffsetXUm;
+    gdsOffsetYInput.value = state.gdsOffsetYUm;
     render();
   });
 
@@ -652,8 +685,12 @@
     })).textContent = `+Y`;
 
     // Ruler: tick marks + um labels along both axes, spaced at a "nice" round interval.
+    // The assumed center (where GDS-X/Y = dieSize/2 normally lands) can be nudged by
+    // the GDS Origin Offset calibration, to correct a systematic measurement bias.
     const halfWidthUm = halfMmX * 1000;
     const halfHeightUm = halfMmY * 1000;
+    const assumedCenterXUm = halfWidthUm + state.gdsOffsetXUm;
+    const assumedCenterYUm = halfHeightUm + state.gdsOffsetYUm;
     const pxPerUm = mmToPx / 1000;
     const TARGET_TICKS = 4;
     const stepUm = niceStep(Math.max(halfWidthUm, halfHeightUm) / TARGET_TICKS);
@@ -667,9 +704,9 @@
         }));
         dieSvg.appendChild(svgEl('text', {
           class: 'axis-label tick-label', x: tx, y: centerPx + TICK_LEN + 11, 'text-anchor': 'middle',
-        // Label with the absolute GDS-X value (origin at the die's corner), not
-        // the centered offset, so it matches the raw value shown in tooltips.
-        })).textContent = `${Math.round(halfWidthUm + sign * vUm)}`;
+        // Label with the absolute GDS-X value (origin at the die's corner,
+        // adjusted by any calibration offset), matching the raw tooltip value.
+        })).textContent = `${Math.round(assumedCenterXUm + sign * vUm)}`;
       }
     }
     for (let vUm = stepUm; vUm <= halfHeightUm + 1e-6; vUm += stepUm) {
@@ -680,7 +717,7 @@
         }));
         dieSvg.appendChild(svgEl('text', {
           class: 'axis-label tick-label', x: centerPx - TICK_LEN - 4, y: ty + 3, 'text-anchor': 'end',
-        })).textContent = `${Math.round(halfHeightUm + sign * vUm)}`;
+        })).textContent = `${Math.round(assumedCenterYUm + sign * vUm)}`;
       }
     }
     dieSvg.appendChild(svgEl('text', {
@@ -688,10 +725,11 @@
     })).textContent = 'µm';
 
     defects.forEach((rec, idx) => {
-      // GDS-X/GDS-Y are absolute, corner-origin coordinates (die center = dieSize/2);
-      // convert to a centered mm offset for plotting against the centered die box.
-      const gdsXCenteredMm = (rec.gdsXUm / 1000) - halfMmX;
-      const gdsYCenteredMm = (rec.gdsYUm / 1000) - halfMmY;
+      // GDS-X/GDS-Y are absolute, corner-origin coordinates (die center = dieSize/2,
+      // nudged by the GDS Origin Offset calibration); convert to a centered mm
+      // offset for plotting against the centered die box.
+      const gdsXCenteredMm = (rec.gdsXUm - assumedCenterXUm) / 1000;
+      const gdsYCenteredMm = (rec.gdsYUm - assumedCenterYUm) / 1000;
       const px = centerPx + gdsXCenteredMm * mmToPx;
       const py = centerPx - gdsYCenteredMm * mmToPx;
       const dot = svgEl('circle', { class: 'defect-dot', cx: px, cy: py, r: 5, 'data-idx': idx });
@@ -790,6 +828,11 @@
   function render() {
     renderWafer();
     updateDieSizeHint();
+    if (state.selectedDie) {
+      const { x, y } = state.selectedDie;
+      const defects = state.defectsByDie.get(`${x},${y}`) || [];
+      renderDieDetail(defects, x, y);
+    }
   }
 
   /* ===================== Init ===================== */

@@ -51,6 +51,14 @@ Everything runs in the browser — the file never leaves your machine.
   small. Wafer size and scribe lane can't be inferred this way — there's
   no signal for either in typical die_X/die_Y + GDS-X/Y data — so those
   stay manual, with sensible defaults.
+- **GDS origin calibration**: on the die defect map itself, a "GDS Origin
+  Offset (µm)" X/Y control (with its own auto-calibrate icon, same pattern
+  again) nudges the assumed die center away from the default `dieSize/2` —
+  useful when an inspection tool's coordinate output has a consistent
+  measurement bias. Auto-calibrate sets it so the midpoint of all loaded
+  defects' GDS-X/GDS-Y lines up with the die center; tooltips and the
+  ruler still show/label the real values from the file, only the plotted
+  position shifts.
 - Dark / light theme toggle (persisted locally), responsive layout for
   desktop and mobile
 
@@ -144,9 +152,12 @@ convention below).
   fall within `[0, dieSizeX]` / `[0, dieSizeY]` once converted to mm (e.g.
   `[0, 5000] µm` for a 5mm die, center at `2500 µm`). The die defect map
   still renders the die as a centered box internally, so each value is
-  converted to a centered offset for plotting (`gdsX/1000 - dieSizeX/2`),
-  but tooltips and the ruler's tick labels always show the original
-  absolute value from the file, not the centered offset.
+  converted to a centered offset for plotting
+  (`(gdsX - dieSizeX*1000/2 - gdsOffsetX) / 1000`), but tooltips always
+  show the original absolute value from the file, and the ruler's tick
+  labels show that same absolute value at each tick's position — both
+  unaffected by the GDS Origin Offset, which only shifts where a given
+  value lands, not what's displayed for it.
 
 ## Tech
 
