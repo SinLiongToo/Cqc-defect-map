@@ -89,6 +89,39 @@
   const sidebarToggle = el('sidebarToggle');
   const sidebar = el('sidebar');
   const sidebarBackdrop = el('sidebarBackdrop');
+  const helpBtn = el('helpBtn');
+  const helpModal = el('helpModal');
+  const closeHelpModal = el('closeHelpModal');
+  const dieStage = el('dieStage');
+  const fullViewBtn = el('fullViewBtn');
+  const fullViewModal = el('fullViewModal');
+  const fullViewBody = el('fullViewBody');
+  const closeFullView = el('closeFullView');
+
+  /* ===================== Modals ===================== */
+  function openModal(modal) { modal.hidden = false; }
+  function closeModal(modal) { modal.hidden = true; }
+
+  helpBtn.addEventListener('click', () => openModal(helpModal));
+  closeHelpModal.addEventListener('click', () => closeModal(helpModal));
+  helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeModal(helpModal); });
+
+  fullViewBtn.addEventListener('click', () => {
+    fullViewBody.appendChild(dieStage);
+    openModal(fullViewModal);
+  });
+  function exitFullView() {
+    dieCard.appendChild(dieStage);
+    closeModal(fullViewModal);
+  }
+  closeFullView.addEventListener('click', exitFullView);
+  fullViewModal.addEventListener('click', (e) => { if (e.target === fullViewModal) exitFullView(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!fullViewModal.hidden) exitFullView();
+    else if (!helpModal.hidden) closeModal(helpModal);
+  });
 
   /* ===================== Theme ===================== */
   function applyTheme(theme) {

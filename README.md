@@ -65,6 +65,13 @@ Everything runs in the browser — the file never leaves your machine.
   defects' GDS-X/GDS-Y lines up with the die center; tooltips and the
   ruler still show/label the real values from the file, only the plotted
   position shifts.
+- **Full view**: an icon on the die defect map's header opens it in a large
+  modal (same live SVG and defect list, just reparented and sized bigger —
+  no data or interactivity lost) for closer inspection of the defect
+  pattern. Still scoped to whichever die is highlighted, same as inline.
+- **User guide**: a help icon in the top bar opens a modal with a quick
+  getting-started walkthrough and the full file format reference (moved
+  out of the sidebar to keep it uncluttered).
 - Dark / light theme toggle (persisted locally), responsive layout for
   desktop and mobile
 
@@ -81,6 +88,9 @@ Everything runs in the browser — the file never leaves your machine.
 4. Hover dies on the wafer map to inspect coordinates; click a die to
    highlight its defects in the die defect map (side by side, or below it
    on narrower screens).
+5. Click the full-view icon on the die defect map's header to inspect the
+   pattern at a larger size, or the help icon in the top bar for a
+   walkthrough and the file format reference at any time.
 
 ## File format
 

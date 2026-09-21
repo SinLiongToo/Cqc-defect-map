@@ -26,6 +26,9 @@
       <button id="sidebarToggle" class="icon-btn mobile-only" aria-label="Toggle controls" aria-expanded="false">
         <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
       </button>
+      <button id="helpBtn" class="icon-btn" aria-label="Help / user guide">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm.1 15a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2ZM12 6.5c1.93 0 3.5 1.35 3.5 3.1 0 1.3-.78 2.02-1.5 2.6-.7.56-1.1.92-1.1 1.65v.25h-1.8v-.35c0-1.25.72-1.85 1.45-2.42.63-.5 1.05-.87 1.05-1.53 0-.85-.84-1.5-1.6-1.5-.9 0-1.6.6-1.7 1.55l-1.86-.2C8.62 8 10.03 6.5 12 6.5Z"/></svg>
+      </button>
       <button id="themeToggle" class="icon-btn" aria-label="Toggle dark / light mode">
         <svg id="themeIconMoon" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12.1 22a10 10 0 0 1-8.9-14.6 1 1 0 0 1 1.7-.2 7.6 7.6 0 0 0 10 10 1 1 0 0 1 1.5 1.3A10 10 0 0 1 12.1 22Z"/></svg>
         <svg id="themeIconSun" viewBox="0 0 24 24" width="20" height="20" style="display:none"><path fill="currentColor" d="M12 4a1 1 0 0 1-1-1V1a1 1 0 0 1 2 0v2a1 1 0 0 1-1 1Zm0 19a1 1 0 0 1-1-1v-2a1 1 0 0 1 2 0v2a1 1 0 0 1-1 1ZM4 13H2a1 1 0 0 1 0-2h2a1 1 0 0 1 0 2Zm19 0h-2a1 1 0 0 1 0-2h2a1 1 0 0 1 0 2ZM6.2 7.6 4.8 6.2a1 1 0 1 1 1.4-1.4l1.4 1.4a1 1 0 1 1-1.4 1.4Zm11.6 11.6-1.4-1.4a1 1 0 1 1 1.4-1.4l1.4 1.4a1 1 0 0 1-1.4 1.4ZM17.8 7.6a1 1 0 0 1-1.4-1.4l1.4-1.4a1 1 0 1 1 1.4 1.4ZM6.2 19.2a1 1 0 0 1-1.4-1.4l1.4-1.4a1 1 0 0 1 1.4 1.4ZM12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12Z"/></svg>
@@ -65,6 +68,18 @@
         <p id="csvEncodingNote" class="muted small"></p>
         <p id="csvSkippedNote" class="muted small" hidden></p>
         <p id="csvError" class="error-text" hidden></p>
+      </section>
+
+      <section class="panel" id="statsPanel" hidden>
+        <h2 class="panel-title">Summary</h2>
+        <dl class="stats">
+          <div><dt>Dies on wafer</dt><dd id="statTotalDies">–</dd></div>
+          <div><dt>Usable dies</dt><dd id="statUsableDies">–</dd></div>
+          <div><dt>Edge-excluded dies</dt><dd id="statExcludedDies">–</dd></div>
+          <div><dt>Dies w/ defects</dt><dd id="statDefectDies">–</dd></div>
+          <div><dt>Total defects</dt><dd id="statTotalDefects">–</dd></div>
+        </dl>
+        <div class="legend" id="legend"></div>
       </section>
 
       <section class="panel">
@@ -129,36 +144,6 @@
           </select>
         </label>
       </section>
-
-      <section class="panel" id="statsPanel" hidden>
-        <h2 class="panel-title">Summary</h2>
-        <dl class="stats">
-          <div><dt>Dies on wafer</dt><dd id="statTotalDies">–</dd></div>
-          <div><dt>Usable dies</dt><dd id="statUsableDies">–</dd></div>
-          <div><dt>Edge-excluded dies</dt><dd id="statExcludedDies">–</dd></div>
-          <div><dt>Dies w/ defects</dt><dd id="statDefectDies">–</dd></div>
-          <div><dt>Total defects</dt><dd id="statTotalDefects">–</dd></div>
-        </dl>
-        <div class="legend" id="legend"></div>
-      </section>
-
-      <section class="panel">
-        <h2 class="panel-title">File Format</h2>
-        <p class="muted small">
-          CSV, TSV or XLSX (.xlsx/.xls). Required columns (case-insensitive, flexible naming):
-        </p>
-        <ul class="small muted col-list">
-          <li><code>die_X</code> / <code>X coordinate</code> — grid index, ≥ 0</li>
-          <li><code>die_Y</code> / <code>Y coordinate</code> — grid index, ≥ 0</li>
-          <li><code>GDS-X</code> — µm from die center</li>
-          <li><code>GDS-Y</code> — µm from die center</li>
-        </ul>
-        <p class="muted small">
-          Optional: <code>ECID</code> / <code>CQC number</code> — shown in
-          hover tooltips on both maps.
-        </p>
-        <p class="muted small">Any other extra columns are kept and shown in defect tooltips.</p>
-      </section>
     </aside>
 
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -186,9 +171,12 @@
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2.06A7.002 7.002 0 0 1 18.94 11H21a1 1 0 1 1 0 2h-2.06A7.002 7.002 0 0 1 13 18.94V21a1 1 0 1 1-2 0v-2.06A7.002 7.002 0 0 1 5.06 13H3a1 1 0 1 1 0-2h2.06A7.002 7.002 0 0 1 11 5.06V3a1 1 0 0 1 1-1Zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>
             </button>
           </div>
+          <button type="button" class="icon-btn small-icon-btn" id="fullViewBtn" title="Full view" aria-label="Open die defect map in full view">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm16 0h-2v4h-4v2h6v-6Z"/></svg>
+          </button>
           <button class="text-btn" id="closeDieCard">Clear selection</button>
         </div>
-        <div class="die-stage">
+        <div class="die-stage" id="dieStage">
           <div class="die-svg-wrap">
             <svg id="dieSvg" viewBox="0 0 480 480" role="img" aria-label="Die defect map"></svg>
             <p class="empty-state" id="dieEmptyState">Upload a CSV to plot every defect here by GDS-X/GDS-Y; click a die on the wafer map to highlight its defects.</p>
@@ -197,6 +185,61 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <div class="modal-overlay" id="fullViewModal" hidden>
+    <div class="modal-content modal-content-wide">
+      <div class="modal-header">
+        <h2>Die Defect Map — Full View</h2>
+        <button type="button" class="icon-btn" id="closeFullView" aria-label="Close full view">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M6.4 4.98 12 10.59l5.6-5.6 1.4 1.4-5.6 5.6 5.6 5.6-1.4 1.4-5.6-5.6-5.6 5.6-1.4-1.4 5.6-5.6-5.6-5.6z"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="fullViewBody"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="helpModal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>User Guide</h2>
+        <button type="button" class="icon-btn" id="closeHelpModal" aria-label="Close user guide">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M6.4 4.98 12 10.59l5.6-5.6 1.4 1.4-5.6 5.6 5.6 5.6-1.4 1.4-5.6-5.6-5.6 5.6-1.4-1.4 5.6-5.6-5.6-5.6z"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <h3>Getting started</h3>
+        <ol class="small guide-list">
+          <li>Upload a defect file (CSV, TSV, or XLSX) at the top of the sidebar.</li>
+          <li>Set <strong>Wafer Size</strong>, <strong>Die Size</strong>, and <strong>Notch Direction</strong> to match your data — before or after uploading, both work.</li>
+          <li>Hover a die on the wafer map for its coordinate; click a die to highlight its defects in the die defect map.</li>
+          <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
+          <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
+        </ol>
+
+        <h3>File format</h3>
+        <p class="muted small">
+          CSV, TSV or XLSX (.xlsx/.xls). Required columns (case-insensitive, flexible naming):
+        </p>
+        <ul class="small muted col-list">
+          <li><code>die_X</code> / <code>X coordinate</code> — grid index, ≥ 0</li>
+          <li><code>die_Y</code> / <code>Y coordinate</code> — grid index, ≥ 0</li>
+          <li><code>GDS-X</code> — µm, absolute, origin at the die's own corner</li>
+          <li><code>GDS-Y</code> — µm, absolute, origin at the die's own corner</li>
+        </ul>
+        <p class="muted small">
+          Optional: <code>ECID</code> / <code>CQC number</code> — shown in
+          hover tooltips on both maps.
+        </p>
+        <p class="muted small">
+          Any other extra columns are kept and shown in defect tooltips. A
+          row with a blank <code>die_X</code>/<code>die_Y</code> is dropped
+          entirely; a row with a valid die but blank
+          <code>GDS-X</code>/<code>GDS-Y</code> still counts on the wafer
+          map but isn't plotted on the die defect map.
+        </p>
+      </div>
+    </div>
   </div>
 
   <footer class="app-footer">

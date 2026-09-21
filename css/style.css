@@ -238,6 +238,30 @@ code { font-family: var(--font-mono); }
 
 .app-footer { text-align: center; padding: 14px; border-top: 1px solid var(--border); }
 
+/* ===================== Modals ===================== */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-content {
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); width: 100%; max-width: 560px; max-height: 90vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-content-wide { max-width: 1400px; }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
+}
+.modal-header h2 { margin: 0; font-size: 15px; }
+.modal-body { padding: 20px; overflow: auto; }
+.modal-body h3 { font-size: 13px; color: var(--accent); margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 1px; }
+.modal-body h3:first-child { margin-top: 0; }
+.guide-list { padding-left: 20px; margin: 0; display: flex; flex-direction: column; gap: 8px; color: var(--text-muted); }
+.guide-list strong { color: var(--text); }
+#fullViewBody .die-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 300px); }
+#fullViewBody #dieSvg { max-height: 80vh; }
+
 /* ===================== Responsive ===================== */
 .sidebar-backdrop { display: none; }
 
