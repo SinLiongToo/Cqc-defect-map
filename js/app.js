@@ -48,6 +48,7 @@
   const dieSizeHint = el('dieSizeHint');
   const dieSizeHintText = el('dieSizeHintText');
   const applyDieSizeSuggestion = el('applyDieSizeSuggestion');
+  const autoCalibrateDieSizeBtn = el('autoCalibrateDieSizeBtn');
   const notchSel = el('notchDir');
   const csvInput = el('csvInput');
   const dropzone = el('dropzone');
@@ -770,6 +771,17 @@
   applyDieSizeSuggestion.addEventListener('click', () => {
     dieSizeXInput.value = dieSizeHint.dataset.suggestX;
     dieSizeYInput.value = dieSizeHint.dataset.suggestY;
+    readInputs();
+    render();
+  });
+
+  // Like the wafer map's auto-center icon, this lets Die Size be recalculated
+  // from the loaded data on demand, not just via the reactive too-small hint.
+  autoCalibrateDieSizeBtn.addEventListener('click', () => {
+    const minSize = computeMinDieSizeFromData();
+    if (!minSize) return;
+    dieSizeXInput.value = minSize.minX;
+    dieSizeYInput.value = minSize.minY;
     readInputs();
     render();
   });

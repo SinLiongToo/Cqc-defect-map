@@ -45,10 +45,12 @@ Everything runs in the browser — the file never leaves your machine.
 - **Die size validation**: since GDS-X/GDS-Y are absolute and can't exceed
   the true die size, the app checks loaded data against the current Die
   Size setting and shows a suggestion banner (with a one-click Apply) if
-  the data implies a larger die than what's set. Wafer size and scribe
-  lane can't be inferred this way — there's no signal for either in
-  typical die_X/die_Y + GDS-X/Y data — so those stay manual, with sensible
-  defaults.
+  the data implies a larger die than what's set. An auto-calibrate icon
+  next to Die Size (same pattern as the wafer map's auto-center icon) lets
+  you recompute it from the loaded data on demand, not just when it's too
+  small. Wafer size and scribe lane can't be inferred this way — there's
+  no signal for either in typical die_X/die_Y + GDS-X/Y data — so those
+  stay manual, with sensible defaults.
 - Dark / light theme toggle (persisted locally), responsive layout for
   desktop and mobile
 
