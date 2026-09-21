@@ -69,15 +69,20 @@
       </section>
 
       <section class="panel">
-        <h2 class="panel-title">Defect CSV</h2>
+        <h2 class="panel-title">Defect File</h2>
         <label class="dropzone" id="dropzone" for="csvInput">
           <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.6l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L11 13.6V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
-          <span id="dropzoneLabel">Click or drop CSV/TSV file</span>
-          <input type="file" id="csvInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden />
+          <span id="dropzoneLabel">Click or drop CSV/TSV/XLSX file</span>
+          <input type="file" id="csvInput" accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,text/tab-separated-values,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden />
         </label>
         <p id="csvFileName" class="muted small"></p>
 
-        <label class="field">
+        <label class="field" id="sheetSelectField" hidden>
+          <span>Sheet</span>
+          <select id="sheetSelect"></select>
+        </label>
+
+        <label class="field" id="csvEncodingField">
           <span>File Encoding</span>
           <select id="csvEncoding">
             <option value="utf-8" selected>UTF-8 (default)</option>
@@ -88,6 +93,7 @@
             <option value="shift_jis">Shift-JIS (Japanese)</option>
             <option value="windows-1252">Windows-1252 / ANSI (Latin)</option>
           </select>
+          <span class="muted small">CSV/TSV/TXT only — ignored for XLSX</span>
         </label>
         <p id="csvEncodingNote" class="muted small"></p>
         <p id="csvError" class="error-text" hidden></p>
@@ -104,9 +110,9 @@
       </section>
 
       <section class="panel">
-        <h2 class="panel-title">CSV Format</h2>
+        <h2 class="panel-title">File Format</h2>
         <p class="muted small">
-          Required columns (case-insensitive, flexible naming):
+          CSV, TSV or XLSX (.xlsx/.xls). Required columns (case-insensitive, flexible naming):
         </p>
         <ul class="small muted col-list">
           <li><code>die_X</code> / <code>X coordinate</code></li>
@@ -156,6 +162,7 @@
 <div class="tooltip" id="tooltip" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

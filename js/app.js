@@ -26,7 +26,8 @@
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
     selectedDie: null,      // {x,y}
-    rawBytes: null,         // Uint8Array of the last-loaded file, kept for re-decoding on encoding change
+    rawBytes: null,         // Uint8Array of the last-loaded text file, kept for re-decoding on encoding change
+    workbook: null,         // SheetJS workbook, kept for re-parsing on sheet change (xlsx/xls only)
   };
 
   /* ===================== DOM refs ===================== */
@@ -40,7 +41,10 @@
   const dropzoneLabel = el('dropzoneLabel');
   const csvFileName = el('csvFileName');
   const csvEncoding = el('csvEncoding');
+  const csvEncodingField = el('csvEncodingField');
   const csvEncodingNote = el('csvEncodingNote');
+  const sheetSelectField = el('sheetSelectField');
+  const sheetSelect = el('sheetSelect');
   const csvError = el('csvError');
   const statsPanel = el('statsPanel');
   const statTotalDies = el('statTotalDies');
@@ -165,19 +169,32 @@
     return { text, detectedEncoding: bom ? bom.encoding : null };
   }
 
-  async function loadCsvFile(file) {
+  function fileExt(file) {
+    const parts = file.name.toLowerCase().split('.');
+    return parts.length > 1 ? parts.pop() : '';
+  }
+
+  async function handleFileSelected(file) {
     csvError.hidden = true;
     csvEncodingNote.textContent = '';
+    const ext = fileExt(file);
     try {
-      const buffer = await readFileAsArrayBuffer(file);
-      state.rawBytes = new Uint8Array(buffer);
-      decodeAndParse();
+      if (ext === 'xlsx' || ext === 'xls') {
+        await loadXlsxFile(file);
+      } else {
+        state.workbook = null;
+        sheetSelectField.hidden = true;
+        csvEncodingField.hidden = false;
+        const buffer = await readFileAsArrayBuffer(file);
+        state.rawBytes = new Uint8Array(buffer);
+        decodeAndParseText();
+      }
     } catch (err) {
       showCsvError(err.message || 'Failed to read file.');
     }
   }
 
-  function decodeAndParse() {
+  function decodeAndParseText() {
     if (!state.rawBytes) return;
     csvError.hidden = true;
     const { text, detectedEncoding } = decodeCsvBytes(state.rawBytes, csvEncoding.value);
@@ -200,6 +217,43 @@
       },
       error: (err) => showCsvError(err.message || 'Failed to parse file.'),
     });
+  }
+
+  async function loadXlsxFile(file) {
+    state.rawBytes = null;
+    csvEncodingField.hidden = true;
+    const buffer = await readFileAsArrayBuffer(file);
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    if (!workbook.SheetNames.length) {
+      throw new Error('Workbook has no sheets.');
+    }
+    state.workbook = workbook;
+
+    sheetSelect.innerHTML = '';
+    for (const name of workbook.SheetNames) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sheetSelect.appendChild(opt);
+    }
+    sheetSelectField.hidden = workbook.SheetNames.length < 2;
+
+    parseWorkbookSheet(workbook.SheetNames[0]);
+  }
+
+  function parseWorkbookSheet(sheetName) {
+    if (!state.workbook || !state.workbook.Sheets[sheetName]) return;
+    csvError.hidden = true;
+    sheetSelect.value = sheetName;
+    const sheet = state.workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
+    const headerRow = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true })[0] || [];
+    const headers = headerRow.map((h) => String(h));
+    try {
+      handleParsedCsv(rows, headers);
+    } catch (err) {
+      showCsvError(err.message);
+    }
   }
 
   function showCsvError(msg) {
@@ -268,8 +322,8 @@
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     csvFileName.textContent = file.name;
-    dropzoneLabel.textContent = 'Replace CSV file';
-    loadCsvFile(file);
+    dropzoneLabel.textContent = 'Replace file';
+    handleFileSelected(file);
   });
 
   ['dragenter', 'dragover'].forEach((evt) => {
@@ -283,11 +337,12 @@
     if (!file) return;
     csvInput.files = e.dataTransfer.files;
     csvFileName.textContent = file.name;
-    dropzoneLabel.textContent = 'Replace CSV file';
-    loadCsvFile(file);
+    dropzoneLabel.textContent = 'Replace file';
+    handleFileSelected(file);
   });
 
-  csvEncoding.addEventListener('change', () => decodeAndParse());
+  csvEncoding.addEventListener('change', () => decodeAndParseText());
+  sheetSelect.addEventListener('change', () => parseWorkbookSheet(sheetSelect.value));
 
   /* ===================== Inputs ===================== */
   function readInputs() {
