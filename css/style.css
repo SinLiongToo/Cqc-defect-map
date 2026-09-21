@@ -164,6 +164,7 @@ code { font-family: var(--font-mono); }
 }
 
 .die-stage { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+.die-svg-wrap { position: relative; }
 #dieSvg { width: 100%; height: auto; background: var(--bg-inset); border-radius: 10px; border: 1px solid var(--border-soft); }
 .die-defect-list { max-height: 480px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 .defect-row {

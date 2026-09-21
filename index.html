@@ -110,7 +110,7 @@
       <section class="stage-card">
         <div class="stage-header">
           <h2>Wafer Map</h2>
-          <span class="muted small">Hover a die for its coordinate · click a die to inspect defects</span>
+          <span class="muted small">Hover a die for its coordinate · click a die to plot its defects in the map below</span>
         </div>
         <div class="wafer-stage" id="waferStage">
           <svg id="waferSvg" viewBox="0 0 640 640" role="img" aria-label="Wafer map"></svg>
@@ -118,13 +118,16 @@
         </div>
       </section>
 
-      <section class="stage-card" id="dieCard" hidden>
+      <section class="stage-card" id="dieCard">
         <div class="stage-header">
-          <h2>Die Inspector — <span id="dieCardTitle">–</span></h2>
-          <button class="text-btn" id="closeDieCard">Close ✕</button>
+          <h2>Die Defect Map — <span id="dieCardTitle">–</span></h2>
+          <button class="text-btn" id="closeDieCard">Clear selection</button>
         </div>
         <div class="die-stage">
-          <svg id="dieSvg" viewBox="0 0 480 480" role="img" aria-label="Die defect map"></svg>
+          <div class="die-svg-wrap">
+            <svg id="dieSvg" viewBox="0 0 480 480" role="img" aria-label="Die defect map"></svg>
+            <p class="empty-state" id="dieEmptyState">Upload a CSV, then click a die on the wafer map above to plot its defects by GDS-X/GDS-Y.</p>
+          </div>
           <div class="die-defect-list" id="dieDefectList"></div>
         </div>
       </section>

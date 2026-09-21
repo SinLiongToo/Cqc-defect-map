@@ -49,6 +49,7 @@
   const dieCard = el('dieCard');
   const dieCardTitle = el('dieCardTitle');
   const dieSvg = el('dieSvg');
+  const dieEmptyState = el('dieEmptyState');
   const dieDefectList = el('dieDefectList');
   const closeDieCard = el('closeDieCard');
   const tooltip = el('tooltip');
@@ -187,9 +188,18 @@
       if (!state.defectsByDie.has(key)) state.defectsByDie.set(key, []);
       state.defectsByDie.get(key).push(rec);
     }
+    // Auto-select the die with the most defects so both maps are populated immediately.
+    let busiestKey = null;
+    let busiestCount = -1;
+    for (const [key, defects] of state.defectsByDie) {
+      if (defects.length > busiestCount) { busiestCount = defects.length; busiestKey = key; }
+    }
     state.selectedDie = null;
-    dieCard.hidden = true;
     render();
+    if (busiestKey) {
+      const [bx, by] = busiestKey.split(',').map(Number);
+      selectDie(bx, by);
+    }
   }
 
   csvInput.addEventListener('change', (e) => {
@@ -362,7 +372,7 @@
     const key = `${x},${y}`;
     const defects = state.defectsByDie.get(key) || [];
     state.selectedDie = { x, y };
-    dieCard.hidden = false;
+    dieEmptyState.hidden = true;
     dieCardTitle.textContent = `Die (${x}, ${y}) — ${defects.length} defect${defects.length === 1 ? '' : 's'}`;
     renderDieDetail(defects);
     renderWafer(); // refresh selection outline
@@ -436,8 +446,11 @@
   }
 
   closeDieCard.addEventListener('click', () => {
-    dieCard.hidden = true;
     state.selectedDie = null;
+    dieCardTitle.textContent = '–';
+    dieSvg.innerHTML = '';
+    dieDefectList.innerHTML = '';
+    dieEmptyState.hidden = false;
     renderWafer();
   });
 
