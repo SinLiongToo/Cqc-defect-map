@@ -152,7 +152,7 @@
       <section class="stage-card">
         <div class="stage-header">
           <h2>Wafer Map</h2>
-          <span class="muted small">Hover a die for its coordinate · click a die to highlight its defects in the map below</span>
+          <span class="muted small">Hover a die for its coordinate · click a die to highlight its defects below · Ctrl/Shift-click to select multiple dies</span>
         </div>
         <div class="wafer-stage" id="waferStage">
           <svg id="waferSvg" viewBox="0 0 640 640" role="img" aria-label="Wafer map"></svg>
@@ -179,6 +179,10 @@
               <option value="180">180°</option>
               <option value="270">270°</option>
             </select>
+          </label>
+          <label class="gds-calibration">
+            <span class="muted small">Grid Color</span>
+            <input type="color" id="gridLineColor" value="#3a4a5c" class="calib-color" aria-label="Grid line color" title="Grid line color" />
           </label>
           <button type="button" class="icon-btn small-icon-btn" id="fullViewBtn" title="Full view" aria-label="Open die defect map in full view">
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm16 0h-2v4h-4v2h6v-6Z"/></svg>
@@ -221,7 +225,7 @@
         <ol class="small guide-list">
           <li>Upload a defect file (CSV, TSV, or XLSX) at the top of the sidebar.</li>
           <li>Set <strong>Wafer Size</strong>, <strong>Die Size</strong>, and <strong>Notch Direction</strong> to match your data — before or after uploading, both work.</li>
-          <li>Hover a die on the wafer map for its coordinate; click a die to highlight its defects in the die defect map.</li>
+          <li>Hover a die on the wafer map for its coordinate; click a die to highlight its defects in the die defect map. Ctrl/Cmd/Shift-click to select multiple dies at once.</li>
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
         </ol>

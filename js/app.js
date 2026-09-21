@@ -30,13 +30,16 @@
     gdsOffsetXUm: 0,
     gdsOffsetYUm: 0,
     dieRotationDeg: 0,
+    gridLineColor: null,    // hex string once user picks one, else CSS default
     notch: 'down',
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
-    selectedDie: null,      // {x,y}
+    selectedDies: new Set(),// Set of "x,y" keys -- supports multi-select (ctrl/shift-click)
     rawBytes: null,         // Uint8Array of the last-loaded text file, kept for re-decoding on encoding change
     workbook: null,         // SheetJS workbook, kept for re-parsing on sheet change (xlsx/xls only)
   };
+
+  function dieKey(x, y) { return `${x},${y}`; }
 
   /* ===================== DOM refs ===================== */
   const el = (id) => document.getElementById(id);
@@ -84,6 +87,7 @@
   const gdsOffsetYInput = el('gdsOffsetY');
   const autoCalibrateGdsBtn = el('autoCalibrateGdsBtn');
   const dieRotationSel = el('dieRotation');
+  const gridLineColorInput = el('gridLineColor');
   const tooltip = el('tooltip');
   const themeToggle = el('themeToggle');
   const themeIconMoon = el('themeIconMoon');
@@ -415,7 +419,7 @@
     for (const [key, defects] of state.defectsByDie) {
       if (defects.length > busiestCount) { busiestCount = defects.length; busiestKey = key; }
     }
-    state.selectedDie = null;
+    state.selectedDies = new Set();
     render();
     if (busiestKey) {
       const [bx, by] = busiestKey.split(',').map(Number);
@@ -468,6 +472,12 @@
     centerOffsetXInput, centerOffsetYInput, gdsOffsetXInput, gdsOffsetYInput, dieRotationSel, notchSel,
   ].forEach((input) => {
     input.addEventListener('change', () => { readInputs(); render(); });
+  });
+
+  // 'input' (not 'change') for live preview while dragging the color picker.
+  gridLineColorInput.addEventListener('input', () => {
+    state.gridLineColor = gridLineColorInput.value;
+    if (state.records.length) renderDieDetail();
   });
 
   autoCenterBtn.addEventListener('click', () => {
@@ -679,7 +689,10 @@
       rect.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, dieTip));
       rect.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, dieTip));
       rect.addEventListener('mouseleave', hideTooltip);
-      rect.addEventListener('click', () => selectDie(die.i, die.j));
+      rect.addEventListener('click', (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) toggleDieSelection(die.i, die.j);
+        else selectDie(die.i, die.j);
+      });
       group.appendChild(rect);
     }
 
@@ -694,26 +707,50 @@
     statTotalDefects.textContent = totalDefects.toLocaleString();
     renderLegend();
 
-    // reflect current selection highlight, if any
-    if (state.selectedDie) {
-      const sel = waferSvg.querySelector(
-        `.die-rect[data-die-x="${state.selectedDie.x}"][data-die-y="${state.selectedDie.y}"]`
-      );
+    // reflect current selection highlight(s), if any
+    for (const key of state.selectedDies) {
+      const [sx, sy] = key.split(',');
+      const sel = waferSvg.querySelector(`.die-rect[data-die-x="${sx}"][data-die-y="${sy}"]`);
       if (sel) sel.classList.add('selected');
     }
   }
 
   /* ===================== Die inspector ===================== */
+  function updateDieCardTitle() {
+    const keys = [...state.selectedDies];
+    if (keys.length === 0) {
+      dieCardTitle.textContent = 'All dies';
+    } else if (keys.length === 1) {
+      const [x, y] = keys[0].split(',');
+      const defects = state.defectsByDie.get(keys[0]) || [];
+      dieCardTitle.textContent = `Die (${x}, ${y}) — ${defects.length} defect${defects.length === 1 ? '' : 's'}`;
+    } else {
+      let total = 0;
+      for (const k of keys) total += (state.defectsByDie.get(k) || []).length;
+      dieCardTitle.textContent = `${keys.length} dies selected — ${total} defect${total === 1 ? '' : 's'}`;
+    }
+  }
+
+  // Plain click: select just this die (replace any existing selection).
   function selectDie(x, y) {
-    const key = `${x},${y}`;
-    const defects = state.defectsByDie.get(key) || [];
-    state.selectedDie = { x, y };
-    dieCardTitle.textContent = `Die (${x}, ${y}) — ${defects.length} defect${defects.length === 1 ? '' : 's'}`;
-    renderDieDetail(defects, x, y);
+    state.selectedDies = new Set([dieKey(x, y)]);
+    updateDieCardTitle();
+    renderDieDetail();
     renderWafer(); // refresh selection outline
     // Don't scroll the (now mostly empty) card into view while its contents
     // are reparented into the full-view modal.
     if (fullViewModal.hidden) dieCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // Ctrl/Cmd/Shift-click: add or remove this die from the current selection,
+  // for inspecting several dies' defects together.
+  function toggleDieSelection(x, y) {
+    const key = dieKey(x, y);
+    if (state.selectedDies.has(key)) state.selectedDies.delete(key);
+    else state.selectedDies.add(key);
+    updateDieCardTitle();
+    renderDieDetail();
+    renderWafer();
   }
 
   function niceStep(rough) {
@@ -729,14 +766,14 @@
     return niceFraction * base;
   }
 
-  function renderDieDetail(defects, dieX, dieY) {
+  function renderDieDetail() {
     dieSvg.innerHTML = '';
     dieDefectList.innerHTML = '';
 
     // Composite view: every defect from every die is plotted (all dies share
     // the same Die Size, so they all fit the same box); only the selected
-    // die's own points are drawn highlighted, hooked up via wafer map clicks
-    // by the caller. Hidden only if nothing anywhere has a plottable location.
+    // die's (or dies', if multiple are selected) own points are drawn
+    // highlighted. Hidden only if nothing anywhere has a plottable location.
     const anyPlottable = state.records.some((r) => r.gdsXUm !== null && r.gdsYUm !== null);
     if (!anyPlottable) {
       dieEmptyState.textContent = 'No defects have a GDS-X/GDS-Y location to plot.';
@@ -765,6 +802,15 @@
       if (rotationDeg) node.setAttribute('transform', `rotate(${-rotationDeg} ${attrs.x} ${attrs.y})`);
       return node;
     }
+    // A presentation attribute like fill/stroke has the LOWEST possible CSS
+    // priority and would be overridden by the .grid-line class rule -- use an
+    // inline style instead, which behaves like a normal high-priority author
+    // style and actually wins.
+    function gridLine(attrs) {
+      const node = svgEl('line', { class: 'grid-line', ...attrs });
+      if (state.gridLineColor) node.style.stroke = state.gridLineColor;
+      return node;
+    }
 
     group.appendChild(svgEl('rect', {
       class: 'die-outline',
@@ -787,9 +833,7 @@
     for (let vUm = stepUm; vUm <= halfWidthUm + 1e-6; vUm += stepUm) {
       for (const sign of [1, -1]) {
         const tx = centerPx + sign * vUm * pxPerUm;
-        group.appendChild(svgEl('line', {
-          class: 'grid-line', x1: tx, y1: centerPx - dieH / 2, x2: tx, y2: centerPx + dieH / 2,
-        }));
+        group.appendChild(gridLine({ x1: tx, y1: centerPx - dieH / 2, x2: tx, y2: centerPx + dieH / 2 }));
         group.appendChild(svgEl('line', {
           class: 'tick-mark', x1: tx, y1: centerPx - TICK_LEN, x2: tx, y2: centerPx + TICK_LEN,
         }));
@@ -803,9 +847,7 @@
     for (let vUm = stepUm; vUm <= halfHeightUm + 1e-6; vUm += stepUm) {
       for (const sign of [1, -1]) {
         const ty = centerPx - sign * vUm * pxPerUm;
-        group.appendChild(svgEl('line', {
-          class: 'grid-line', x1: centerPx - dieW / 2, y1: ty, x2: centerPx + dieW / 2, y2: ty,
-        }));
+        group.appendChild(gridLine({ x1: centerPx - dieW / 2, y1: ty, x2: centerPx + dieW / 2, y2: ty }));
         group.appendChild(svgEl('line', {
           class: 'tick-mark', x1: centerPx - TICK_LEN, y1: ty, x2: centerPx + TICK_LEN, y2: ty,
         }));
@@ -832,12 +874,13 @@
       class: 'axis-label tick-label', x: centerPx - dieW / 2 + 4, y: centerPx - dieH / 2 + 12,
     })).textContent = 'µm';
 
-    // Plot every plottable defect from every die. When a die is selected, its
-    // own points are drawn on top, larger and in the accent color, while
-    // everything else is dimmed for pattern context. With no selection, every
-    // dot is drawn the same (no dimming) since nothing is being emphasized.
-    const hasSelection = dieX !== undefined && dieX !== null;
-    const isSelectedRec = (rec) => hasSelection && rec.dieX === dieX && rec.dieY === dieY;
+    // Plot every plottable defect from every die. When one or more dies are
+    // selected, their own points are drawn on top, larger and in the accent
+    // color, while everything else is dimmed for pattern context. With no
+    // selection, every dot is drawn the same (no dimming) since nothing is
+    // being emphasized.
+    const hasSelection = state.selectedDies.size > 0;
+    const isSelectedRec = (rec) => hasSelection && state.selectedDies.has(dieKey(rec.dieX, rec.dieY));
     const plotOrder = state.records
       .filter((rec) => rec.gdsXUm !== null && rec.gdsYUm !== null)
       .sort((a, b) => Number(isSelectedRec(a)) - Number(isSelectedRec(b))); // selected drawn last (on top)
@@ -863,13 +906,17 @@
       dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
       dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
       dot.addEventListener('mouseleave', hideTooltip);
-      dot.addEventListener('click', () => selectDie(rec.dieX, rec.dieY));
+      dot.addEventListener('click', (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) toggleDieSelection(rec.dieX, rec.dieY);
+        else selectDie(rec.dieX, rec.dieY);
+      });
       group.appendChild(dot);
     }
 
     dieSvg.appendChild(group);
 
-    // Defect list stays scoped to the selected die only.
+    // Defect list stays scoped to the selected die(s) only, combined across
+    // all of them when more than one is selected.
     if (!hasSelection) {
       const p = document.createElement('p');
       p.className = 'muted small';
@@ -877,15 +924,19 @@
       dieDefectList.appendChild(p);
       return;
     }
-    if (!defects.length) {
+    const combinedDefects = state.records.filter(isSelectedRec);
+    const multiSelect = state.selectedDies.size > 1;
+    if (!combinedDefects.length) {
       const p = document.createElement('p');
       p.className = 'muted small';
-      p.textContent = `Die (${dieX}, ${dieY}) has no recorded defects.`;
+      p.textContent = multiSelect
+        ? 'The selected dies have no recorded defects.'
+        : 'This die has no recorded defects.';
       dieDefectList.appendChild(p);
       return;
     }
 
-    defects.forEach((rec, idx) => {
+    combinedDefects.forEach((rec) => {
       const hasGds = rec.gdsXUm !== null && rec.gdsYUm !== null;
       const gdsXText = hasGds ? `${rec.gdsXUm} µm` : 'N/A';
       const gdsYText = hasGds ? `${rec.gdsYUm} µm` : 'N/A';
@@ -893,6 +944,9 @@
       const row = document.createElement('div');
       row.className = 'defect-row';
       let rowHtml = '';
+      if (multiSelect) {
+        rowHtml += `<div><span class="k">Die</span><span>(${rec.dieX}, ${rec.dieY})</span></div>`;
+      }
       if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') {
         rowHtml += `<div><span class="k">ECID</span><span>${escapeHtml(String(rec.ecid))}</span></div>`;
       }
@@ -915,10 +969,10 @@
   }
 
   closeDieCard.addEventListener('click', () => {
-    state.selectedDie = null;
+    state.selectedDies = new Set();
     dieCardTitle.textContent = 'All dies';
     if (state.records.length) {
-      renderDieDetail([], undefined, undefined);
+      renderDieDetail();
     } else {
       dieSvg.innerHTML = '';
       dieDefectList.innerHTML = '';
@@ -986,15 +1040,7 @@
   function render() {
     renderWafer();
     updateDieSizeHint();
-    if (state.records.length) {
-      if (state.selectedDie) {
-        const { x, y } = state.selectedDie;
-        const defects = state.defectsByDie.get(`${x},${y}`) || [];
-        renderDieDetail(defects, x, y);
-      } else {
-        renderDieDetail([], undefined, undefined);
-      }
-    }
+    if (state.records.length) renderDieDetail();
   }
 
   /* ===================== Init ===================== */

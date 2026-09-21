@@ -30,20 +30,23 @@ Everything runs in the browser — the file never leaves your machine.
 - **Die defect map**: a composite view plotting *every* defect from *every*
   die at its exact (GDS-X, GDS-Y) absolute coordinate, in the shared
   die-local coordinate system (all dies use the same Die Size), with grid
-  lines and a ruler (tick marks + µm labels, in absolute coordinates
-  matching the tooltips) on both axes — useful for spotting systematic vs.
-  random defect clustering across the whole wafer. Click a die on the
-  wafer map — or a dot on the composite plot itself, from any die — to
-  highlight that die's own points (larger, full color) against everything
-  else (small, dimmed) and sync the highlight back to the wafer map; the
-  defect list to the right of the plot stays scoped to the highlighted
-  die, with its own hover tooltips. Starts auto-highlighted on the die
-  with the most defects; "Clear selection" drops the highlight but keeps
-  the composite plot visible. A **Rotation** control (0°/90°/180°/270°)
-  spins the whole plot to match a die's actual physical orientation —
-  grid, ticks, and dots rotate together while labels stay upright. The
-  two maps sit side by side on wide screens (≥1200px) and stack on
-  narrower ones
+  lines (color customizable via **Grid Color**) and a ruler (tick marks +
+  µm labels, in absolute coordinates matching the tooltips) on both axes —
+  useful for spotting systematic vs. random defect clustering across the
+  whole wafer. Click a die on the wafer map — or a dot on the composite
+  plot itself, from any die — to highlight that die's own points (larger,
+  full color) against everything else (small, dimmed) and sync the
+  highlight back to the wafer map; **Ctrl/Cmd/Shift-click** instead adds or
+  removes a die from the selection, so several dies' defects can be
+  inspected together (the list then shows which die each row is from).
+  The defect list to the right of the plot stays scoped to whichever
+  die(s) are highlighted, with its own hover tooltips. Starts
+  auto-highlighted on the die with the most defects; "Clear selection"
+  drops the highlight but keeps the composite plot visible. A
+  **Rotation** control (0°/90°/180°/270°) spins the whole plot to match a
+  die's actual physical orientation — grid, ticks, and dots rotate
+  together while labels stay upright. The two maps sit side by side on
+  wide screens (≥1200px) and stack on narrower ones
 - On wide screens, side-by-side maps means the die defect map's own plot +
   list also stack (rather than sitting side by side) between ~1200–1599px,
   where there isn't room for both; at ≥1600px there's room for everything
@@ -92,7 +95,8 @@ Everything runs in the browser — the file never leaves your machine.
    your data (before or after uploading — both work).
 4. Hover dies on the wafer map to inspect coordinates; click a die to
    highlight its defects in the die defect map (side by side, or below it
-   on narrower screens).
+   on narrower screens). Ctrl/Cmd/Shift-click to add more dies to the
+   selection instead of replacing it.
 5. Click the full-view icon on the die defect map's header to inspect the
    pattern at a larger size, or the help icon in the top bar for a
    walkthrough and the file format reference at any time.
