@@ -190,10 +190,12 @@
           </button>
           <button class="text-btn" id="closeDieCard">Clear selection</button>
         </div>
+        <p class="muted small stage-hint">Click a dot to highlight its die, click empty space to clear · Ctrl/Shift-click (or -drag a box) to select multiple</p>
         <div class="die-stage" id="dieStage">
-          <div class="die-svg-wrap">
+          <div class="die-svg-wrap" id="dieSvgWrap">
             <svg id="dieSvg" viewBox="0 0 480 480" role="img" aria-label="Die defect map"></svg>
             <p class="empty-state" id="dieEmptyState">Upload a CSV to plot every defect here by GDS-X/GDS-Y; click a die on the wafer map to highlight its defects.</p>
+            <div class="selection-box" id="dieSelectionBox" hidden></div>
           </div>
           <div class="die-defect-list" id="dieDefectList"></div>
         </div>
@@ -226,7 +228,7 @@
         <ol class="small guide-list">
           <li>Upload a defect file (CSV, TSV, or XLSX) at the top of the sidebar.</li>
           <li>Set <strong>Wafer Size</strong>, <strong>Die Size</strong>, and <strong>Notch Direction</strong> to match your data — before or after uploading, both work.</li>
-          <li>Hover a die on the wafer map for its coordinate; click a die to highlight its defects in the die defect map. Ctrl/Cmd/Shift-click, or -drag a box, to select multiple dies at once; click empty space to clear the selection.</li>
+          <li>Hover a die on the wafer map for its coordinate; click a die (or a dot on the die defect map) to highlight it. Ctrl/Cmd/Shift-click, or -drag a box, on either map to select multiple dies at once; click empty space to clear the selection.</li>
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
         </ol>

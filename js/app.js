@@ -88,6 +88,8 @@
   const dieCard = el('dieCard');
   const dieCardTitle = el('dieCardTitle');
   const dieSvg = el('dieSvg');
+  const dieSvgWrap = el('dieSvgWrap');
+  const dieSelectionBox = el('dieSelectionBox');
   const dieEmptyState = el('dieEmptyState');
   const DIE_EMPTY_DEFAULT_TEXT = dieEmptyState.textContent;
   const dieDefectList = el('dieDefectList');
@@ -774,69 +776,75 @@
     renderWafer();
   }
 
-  // Rubber-band multi-select on the wafer map: hold Ctrl/Cmd/Shift and drag to
-  // draw a box, adding every die it touches to the selection (on top of
+  // Rubber-band multi-select, usable on both the wafer map (over .die-rect)
+  // and the die defect map's composite plot (over .defect-dot, using each
+  // dot's own data-die-x/y). Hold Ctrl/Cmd/Shift and drag to draw a box,
+  // adding every matching element it touches to the selection (on top of
   // individual Ctrl/Shift-click). A plain click on empty background, with no
-  // drag, clears the selection instead. Dies tile the wafer edge-to-edge with
-  // almost no gap between them, so the drag has to be allowed to start ON a
-  // die-rect too -- it's only treated as a real drag once the mouse actually
-  // moves; a same-spot mousedown+mouseup still lets the die's own click
-  // handler run untouched (native click semantics: it won't fire at all if
-  // the mouse moved off the original element by mouseup).
-  let waferDrag = null;
+  // drag, clears the selection instead. Both surfaces tile almost
+  // edge-to-edge (dies) or can be densely packed (dots), so the drag has to
+  // be allowed to start ON an item too -- it's only treated as a real drag
+  // once the mouse actually moves; a same-spot mousedown+mouseup still lets
+  // that item's own click handler run untouched (native click semantics:
+  // click won't fire at all if the mouse moved off the original element by
+  // mouseup).
+  function setupDragSelect(container, selectionBoxEl, itemSelector) {
+    let drag = null;
 
-  waferStage.addEventListener('mousedown', (e) => {
-    waferDrag = {
-      modifier: e.ctrlKey || e.metaKey || e.shiftKey,
-      startX: e.clientX, startY: e.clientY, moved: false,
-      startedOnDie: !!e.target.closest('.die-rect'),
-    };
-  });
+    container.addEventListener('mousedown', (e) => {
+      drag = {
+        modifier: e.ctrlKey || e.metaKey || e.shiftKey,
+        startX: e.clientX, startY: e.clientY, moved: false,
+        startedOnItem: !!e.target.closest(itemSelector),
+      };
+    });
 
-  document.addEventListener('mousemove', (e) => {
-    if (!waferDrag) return;
-    if (Math.abs(e.clientX - waferDrag.startX) > 3 || Math.abs(e.clientY - waferDrag.startY) > 3) {
-      waferDrag.moved = true;
-    }
-    if (waferDrag.modifier && waferDrag.moved) {
-      const left = Math.min(waferDrag.startX, e.clientX);
-      const top = Math.min(waferDrag.startY, e.clientY);
-      waferSelectionBox.style.left = `${left}px`;
-      waferSelectionBox.style.top = `${top}px`;
-      waferSelectionBox.style.width = `${Math.abs(e.clientX - waferDrag.startX)}px`;
-      waferSelectionBox.style.height = `${Math.abs(e.clientY - waferDrag.startY)}px`;
-      waferSelectionBox.hidden = false;
-    }
-  });
+    document.addEventListener('mousemove', (e) => {
+      if (!drag) return;
+      if (Math.abs(e.clientX - drag.startX) > 3 || Math.abs(e.clientY - drag.startY) > 3) drag.moved = true;
+      if (drag.modifier && drag.moved) {
+        const left = Math.min(drag.startX, e.clientX);
+        const top = Math.min(drag.startY, e.clientY);
+        selectionBoxEl.style.left = `${left}px`;
+        selectionBoxEl.style.top = `${top}px`;
+        selectionBoxEl.style.width = `${Math.abs(e.clientX - drag.startX)}px`;
+        selectionBoxEl.style.height = `${Math.abs(e.clientY - drag.startY)}px`;
+        selectionBoxEl.hidden = false;
+      }
+    });
 
-  document.addEventListener('mouseup', (e) => {
-    if (!waferDrag) return;
-    const drag = waferDrag;
-    waferDrag = null;
-    waferSelectionBox.hidden = true;
+    document.addEventListener('mouseup', (e) => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      selectionBoxEl.hidden = true;
 
-    if (drag.modifier && drag.moved) {
-      const left = Math.min(drag.startX, e.clientX);
-      const right = Math.max(drag.startX, e.clientX);
-      const top = Math.min(drag.startY, e.clientY);
-      const bottom = Math.max(drag.startY, e.clientY);
-      let changed = false;
-      document.querySelectorAll('.die-rect').forEach((el) => {
-        const r = el.getBoundingClientRect();
-        const intersects = r.left < right && r.right > left && r.top < bottom && r.bottom > top;
-        if (intersects) {
-          const key = dieKey(Number(el.getAttribute('data-die-x')), Number(el.getAttribute('data-die-y')));
-          if (!state.selectedDies.has(key)) { state.selectedDies.add(key); changed = true; }
-        }
-      });
-      if (changed) { updateDieCardTitle(); renderDieDetail(); renderWafer(); }
-    } else if (!drag.modifier && !drag.moved && !drag.startedOnDie) {
-      // Background click with no drag and no modifier -- clear the selection.
-      // (A same-spot click that started on a die is left entirely to that
-      // die's own click handler, whether or not a modifier was held.)
-      clearSelection();
-    }
-  });
+      if (d.modifier && d.moved) {
+        const left = Math.min(d.startX, e.clientX);
+        const right = Math.max(d.startX, e.clientX);
+        const top = Math.min(d.startY, e.clientY);
+        const bottom = Math.max(d.startY, e.clientY);
+        let changed = false;
+        document.querySelectorAll(itemSelector).forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const intersects = r.left < right && r.right > left && r.top < bottom && r.bottom > top;
+          if (intersects) {
+            const key = dieKey(Number(el.getAttribute('data-die-x')), Number(el.getAttribute('data-die-y')));
+            if (!state.selectedDies.has(key)) { state.selectedDies.add(key); changed = true; }
+          }
+        });
+        if (changed) { updateDieCardTitle(); renderDieDetail(); renderWafer(); }
+      } else if (!d.modifier && !d.moved && !d.startedOnItem) {
+        // Background click with no drag and no modifier -- clear the selection.
+        // (A same-spot click that started on an item is left entirely to that
+        // item's own click handler, whether or not a modifier was held.)
+        clearSelection();
+      }
+    });
+  }
+
+  setupDragSelect(waferStage, waferSelectionBox, '.die-rect');
+  setupDragSelect(dieSvgWrap, dieSelectionBox, '.defect-dot');
 
   function niceStep(rough) {
     if (!(rough > 0)) return 1;
@@ -870,11 +878,7 @@
     const usableHalf = (DIE_VIEWBOX / 2) - DIE_MARGIN;
     const halfMmX = state.dieSizeX / 2;
     const halfMmY = state.dieSizeY / 2;
-    const mmToPx = usableHalf / Math.max(halfMmX, halfMmY);
     const centerPx = DIE_VIEWBOX / 2;
-
-    const dieW = state.dieSizeX * mmToPx;
-    const dieH = state.dieSizeY * mmToPx;
 
     // The whole plot (outline, grid, ticks, dots) rotates as one rigid group so
     // the composite view can be reoriented to match a die's actual physical
@@ -897,41 +901,68 @@
       return node;
     }
 
+    // The assumed center (where GDS-X/Y = dieSize/2 normally lands) can be
+    // nudged by the GDS Origin Offset calibration, to correct a systematic
+    // measurement bias. Once auto-calibrated, the absolute center
+    // (data-derived, independent of Die Size) takes priority over the offset
+    // so it stays correct across Die Size changes; the offset fields are kept
+    // in sync purely for display.
+    const dieHalfWidthUm = halfMmX * 1000;
+    const dieHalfHeightUm = halfMmY * 1000;
+    const isCalibratedX = state.gdsCalibratedCenterXUm !== null;
+    const isCalibratedY = state.gdsCalibratedCenterYUm !== null;
+    const assumedCenterXUm = isCalibratedX ? state.gdsCalibratedCenterXUm : dieHalfWidthUm + state.gdsOffsetXUm;
+    const assumedCenterYUm = isCalibratedY ? state.gdsCalibratedCenterYUm : dieHalfHeightUm + state.gdsOffsetYUm;
+    if (isCalibratedX) {
+      state.gdsOffsetXUm = Math.round(assumedCenterXUm - dieHalfWidthUm);
+      gdsOffsetXInput.value = state.gdsOffsetXUm;
+    }
+    if (isCalibratedY) {
+      state.gdsOffsetYUm = Math.round(assumedCenterYUm - dieHalfHeightUm);
+      gdsOffsetYInput.value = state.gdsOffsetYUm;
+    }
+
+    // The plot's scale is based on whichever is bigger: the configured Die
+    // Size, or the actual spread of the loaded data around the assumed
+    // center. Using Die Size alone would silently clip real defects outside
+    // it -- an SVG's root element clips content past its viewBox by default,
+    // so a defect further out than Die Size wouldn't just render outside the
+    // drawn die-outline rectangle (as intended), it could vanish entirely.
+    let halfWidthUm = dieHalfWidthUm;
+    let halfHeightUm = dieHalfHeightUm;
+    for (const rec of state.records) {
+      if (rec.gdsXUm === null || rec.gdsYUm === null) continue;
+      halfWidthUm = Math.max(halfWidthUm, Math.abs(rec.gdsXUm - assumedCenterXUm));
+      halfHeightUm = Math.max(halfHeightUm, Math.abs(rec.gdsYUm - assumedCenterYUm));
+    }
+    const mmToPx = usableHalf / Math.max(halfWidthUm, halfHeightUm) * 1000;
+
+    // Die outline is drawn at its true (possibly smaller) size in this scale,
+    // so it's visually obvious when real defects fall outside the die.
+    const dieW = state.dieSizeX * mmToPx;
+    const dieH = state.dieSizeY * mmToPx;
     group.appendChild(svgEl('rect', {
       class: 'die-outline',
       x: centerPx - dieW / 2, y: centerPx - dieH / 2, width: dieW, height: dieH,
     }));
 
     // Ruler: grid lines + tick marks + um labels along both axes, spaced at a
-    // "nice" round interval. The assumed center (where GDS-X/Y = dieSize/2
-    // normally lands) can be nudged by the GDS Origin Offset calibration, to
-    // correct a systematic measurement bias. Once auto-calibrated, the
-    // absolute center (data-derived, independent of Die Size) takes priority
-    // over the offset so it stays correct across Die Size changes; the
-    // offset fields are kept in sync purely for display.
-    const halfWidthUm = halfMmX * 1000;
-    const halfHeightUm = halfMmY * 1000;
-    const isCalibratedX = state.gdsCalibratedCenterXUm !== null;
-    const isCalibratedY = state.gdsCalibratedCenterYUm !== null;
-    const assumedCenterXUm = isCalibratedX ? state.gdsCalibratedCenterXUm : halfWidthUm + state.gdsOffsetXUm;
-    const assumedCenterYUm = isCalibratedY ? state.gdsCalibratedCenterYUm : halfHeightUm + state.gdsOffsetYUm;
-    if (isCalibratedX) {
-      state.gdsOffsetXUm = Math.round(assumedCenterXUm - halfWidthUm);
-      gdsOffsetXInput.value = state.gdsOffsetXUm;
-    }
-    if (isCalibratedY) {
-      state.gdsOffsetYUm = Math.round(assumedCenterYUm - halfHeightUm);
-      gdsOffsetYInput.value = state.gdsOffsetYUm;
-    }
+    // "nice" round interval, covering the full plotted extent (not just the
+    // die outline).
     const pxPerUm = mmToPx / 1000;
     const TARGET_TICKS = 4;
     const stepUm = niceStep(Math.max(halfWidthUm, halfHeightUm) / TARGET_TICKS);
     const TICK_LEN = 5;
+    // Grid lines, crosshair, and axis labels span the full plotted extent
+    // (which may be larger than the die outline itself, see above) so every
+    // defect has a ruler/grid reference, not just ones inside the die box.
+    const plotHalfWidthPx = halfWidthUm * pxPerUm;
+    const plotHalfHeightPx = halfHeightUm * pxPerUm;
 
     for (let vUm = stepUm; vUm <= halfWidthUm + 1e-6; vUm += stepUm) {
       for (const sign of [1, -1]) {
         const tx = centerPx + sign * vUm * pxPerUm;
-        group.appendChild(gridLine({ x1: tx, y1: centerPx - dieH / 2, x2: tx, y2: centerPx + dieH / 2 }));
+        group.appendChild(gridLine({ x1: tx, y1: centerPx - plotHalfHeightPx, x2: tx, y2: centerPx + plotHalfHeightPx }));
         group.appendChild(svgEl('line', {
           class: 'tick-mark', x1: tx, y1: centerPx - TICK_LEN, x2: tx, y2: centerPx + TICK_LEN,
         }));
@@ -945,7 +976,7 @@
     for (let vUm = stepUm; vUm <= halfHeightUm + 1e-6; vUm += stepUm) {
       for (const sign of [1, -1]) {
         const ty = centerPx - sign * vUm * pxPerUm;
-        group.appendChild(gridLine({ x1: centerPx - dieW / 2, y1: ty, x2: centerPx + dieW / 2, y2: ty }));
+        group.appendChild(gridLine({ x1: centerPx - plotHalfWidthPx, y1: ty, x2: centerPx + plotHalfWidthPx, y2: ty }));
         group.appendChild(svgEl('line', {
           class: 'tick-mark', x1: centerPx - TICK_LEN, y1: ty, x2: centerPx + TICK_LEN, y2: ty,
         }));
@@ -957,19 +988,19 @@
 
     // Center crosshair (the die's own axes), drawn over the grid lines.
     group.appendChild(svgEl('line', {
-      class: 'axis-line', x1: centerPx - dieW / 2, y1: centerPx, x2: centerPx + dieW / 2, y2: centerPx,
+      class: 'axis-line', x1: centerPx - plotHalfWidthPx, y1: centerPx, x2: centerPx + plotHalfWidthPx, y2: centerPx,
     }));
     group.appendChild(svgEl('line', {
-      class: 'axis-line', x1: centerPx, y1: centerPx - dieH / 2, x2: centerPx, y2: centerPx + dieH / 2,
+      class: 'axis-line', x1: centerPx, y1: centerPx - plotHalfHeightPx, x2: centerPx, y2: centerPx + plotHalfHeightPx,
     }));
     group.appendChild(textEl({
-      class: 'axis-label', x: centerPx + dieW / 2 - 4, y: centerPx - 6, 'text-anchor': 'end',
+      class: 'axis-label', x: centerPx + plotHalfWidthPx - 4, y: centerPx - 6, 'text-anchor': 'end',
     })).textContent = `+X`;
     group.appendChild(textEl({
-      class: 'axis-label', x: centerPx + 6, y: centerPx - dieH / 2 + 10,
+      class: 'axis-label', x: centerPx + 6, y: centerPx - plotHalfHeightPx + 10,
     })).textContent = `+Y`;
     group.appendChild(textEl({
-      class: 'axis-label tick-label', x: centerPx - dieW / 2 + 4, y: centerPx - dieH / 2 + 12,
+      class: 'axis-label tick-label', x: centerPx - plotHalfWidthPx + 4, y: centerPx - plotHalfHeightPx + 12,
     })).textContent = 'µm';
 
     // Plot every plottable defect from every die. When one or more dies are
@@ -995,6 +1026,7 @@
       const dotClass = !hasSelection ? 'defect-dot' : (selected ? 'defect-dot highlighted' : 'defect-dot dimmed');
       const dot = svgEl('circle', {
         class: dotClass, cx: px, cy: py, r: !hasSelection ? 4 : (selected ? 5 : 3),
+        'data-die-x': rec.dieX, 'data-die-y': rec.dieY,
       });
       const tipLines = [`Die (${rec.dieX}, ${rec.dieY})`];
       if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);

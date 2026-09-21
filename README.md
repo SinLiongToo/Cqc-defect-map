@@ -39,10 +39,11 @@ Everything runs in the browser — the file never leaves your machine.
   highlight back to the wafer map; **Ctrl/Cmd/Shift-click** instead adds or
   removes a die from the selection, so several dies' defects can be
   inspected together (the list then shows which die each row is from). On
-  the wafer map, **Ctrl/Cmd/Shift-drag** draws a selection box and adds
-  every die it touches in one go — dies tile the wafer edge-to-edge, so the
-  drag can start on a die itself, not just bare background; a plain click
-  on empty space (outside any die) clears the whole selection. The defect
+  **either map**, **Ctrl/Cmd/Shift-drag** draws a selection box and adds
+  every die (or dot) it touches in one go — items tile edge-to-edge or can
+  sit densely packed, so the drag can start right on one, not just bare
+  background; a plain click on empty space clears the whole selection. The
+  same drag-select still works after opening Full View. The defect
   list to the right of the plot stays scoped to whichever die(s) are
   highlighted, with its own hover tooltips. Starts
   auto-highlighted on the die with the most defects; "Clear selection"
@@ -207,6 +208,15 @@ convention below).
   labels show that same absolute value at each tick's position — both
   unaffected by the GDS Origin Offset, which only shifts where a given
   value lands, not what's displayed for it.
+- **Die defect map scale never clips real data**: the plot's scale is based
+  on whichever is larger, Die Size or the actual spread of loaded
+  GDS-X/GDS-Y around the calibrated center. An SVG's root element clips
+  anything past its viewBox by default, so if the scale were based on Die
+  Size alone, a defect further out than Die Size wouldn't just render
+  outside the drawn die-outline rectangle as intended — it could silently
+  vanish. The die outline itself is still drawn at its true (possibly much
+  smaller) size in this scale, so it's visually obvious when Die Size
+  doesn't match the data — check the Die Size hint banner in that case.
 
 ## Tech
 
