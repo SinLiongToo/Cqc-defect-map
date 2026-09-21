@@ -28,8 +28,9 @@ Everything runs in the browser — the file never leaves your machine.
   Hover a die to see its (die_X, die_Y) coordinate, defect count, ECID(s)
   if present, and edge-exclusion status
 - **Die defect map**: always-visible second view plotting each defect of the
-  selected die at its exact (GDS-X, GDS-Y) offset from the die center, with
-  a ruler (tick marks + µm labels) on both axes, and a hover tooltip and
+  selected die at its exact (GDS-X, GDS-Y) absolute coordinate, with a
+  ruler (tick marks + µm labels, labeled in absolute coordinates to match)
+  on both axes, and a hover tooltip and
   list showing ECID (if present) plus every column from the CSV for that
   defect. Click any die on the wafer map to inspect it here; it starts
   auto-selected to the die with the most defects. If the selected die has
@@ -41,12 +42,13 @@ Everything runs in the browser — the file never leaves your machine.
   midpoint. Set it manually, or click the auto-center icon to derive it
   from the loaded data (centers on the midpoint of the die_X/die_Y range
   actually present in the file)
-- **Die size validation**: since a defect's GDS offset can't exceed half the
-  true die size, the app checks loaded data against the current Die Size
-  setting and shows a suggestion banner (with a one-click Apply) if the data
-  implies a larger die than what's set. Wafer size and scribe lane can't be
-  inferred this way — there's no signal for either in typical die_X/die_Y +
-  GDS-X/Y data — so those stay manual, with sensible defaults.
+- **Die size validation**: since GDS-X/GDS-Y are absolute and can't exceed
+  the true die size, the app checks loaded data against the current Die
+  Size setting and shows a suggestion banner (with a one-click Apply) if
+  the data implies a larger die than what's set. Wafer size and scribe
+  lane can't be inferred this way — there's no signal for either in
+  typical die_X/die_Y + GDS-X/Y data — so those stay manual, with sensible
+  defaults.
 - Dark / light theme toggle (persisted locally), responsive layout for
   desktop and mobile
 
@@ -72,8 +74,8 @@ so any of the listed aliases work, for either format:
 |---|---|---|
 | Die column index | `die_X`, `X coordinate` | non-negative integer grid index of the die on the wafer (not mm) |
 | Die row index | `die_Y`, `Y coordinate` | non-negative integer grid index of the die on the wafer |
-| Defect X offset | `GDS-X` | in **µm, relative to the die center** |
-| Defect Y offset | `GDS-Y` | in **µm, relative to the die center** |
+| Defect X coordinate | `GDS-X` | in **µm, absolute — origin at the die's own corner**, range `[0, dieSizeX]` |
+| Defect Y coordinate | `GDS-Y` | in **µm, absolute — origin at the die's own corner**, range `[0, dieSizeY]` |
 | ECID / chip ID *(optional)* | `ECID`, `CQC number`, `CQC ID`, `CQC` | shown prominently in both maps' hover tooltips if present |
 
 Any other columns (defect class, size, etc.) are preserved and shown in the
@@ -134,10 +136,15 @@ convention below).
   (clockwise) — as a visual/orientation reference. It does not remap which
   die index is which; it only changes where the notch appears relative to
   the fixed die grid.
-- **Defect location**: `GDS-X`/`GDS-Y` are given in **µm**, relative to the
-  center of their die, so values should generally fall within
-  `[-dieSizeX/2, dieSizeX/2]` and `[-dieSizeY/2, dieSizeY/2]` once converted
-  to mm (i.e. `±2500 µm` for a 5mm die).
+- **Defect location**: `GDS-X`/`GDS-Y` are **absolute** die-local coordinates
+  in µm, with the origin at the die's own corner — so the die's center sits
+  at `(dieSizeX/2, dieSizeY/2)` in that coordinate system, and valid values
+  fall within `[0, dieSizeX]` / `[0, dieSizeY]` once converted to mm (e.g.
+  `[0, 5000] µm` for a 5mm die, center at `2500 µm`). The die defect map
+  still renders the die as a centered box internally, so each value is
+  converted to a centered offset for plotting (`gdsX/1000 - dieSizeX/2`),
+  but tooltips and the ruler's tick labels always show the original
+  absolute value from the file, not the centered offset.
 
 ## Tech
 

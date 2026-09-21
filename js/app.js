@@ -308,8 +308,11 @@
       const raw = {};
       for (const col of extraCols) raw[col] = row[col];
       const ecid = ecidCol ? row[ecidCol] : null;
-      // GDS-X/GDS-Y are given in micrometers; convert to mm (matches die size units) for plotting.
-      records.push({ dieX, dieY, gdsXUm, gdsYUm, gdsX: gdsXUm / 1000, gdsY: gdsYUm / 1000, ecid, raw });
+      // GDS-X/GDS-Y are absolute die-local coordinates in micrometers, origin at
+      // the die's own corner (die center sits at dieSize/2) -- not an offset from
+      // the die center. Kept raw here; converted to a centered mm offset for
+      // plotting wherever the die size is known (it can change after parsing).
+      records.push({ dieX, dieY, gdsXUm, gdsYUm, ecid, raw });
     }
 
     if (!records.length) {
@@ -663,7 +666,9 @@
         }));
         dieSvg.appendChild(svgEl('text', {
           class: 'axis-label tick-label', x: tx, y: centerPx + TICK_LEN + 11, 'text-anchor': 'middle',
-        })).textContent = `${sign * Math.round(vUm)}`;
+        // Label with the absolute GDS-X value (origin at the die's corner), not
+        // the centered offset, so it matches the raw value shown in tooltips.
+        })).textContent = `${Math.round(halfWidthUm + sign * vUm)}`;
       }
     }
     for (let vUm = stepUm; vUm <= halfHeightUm + 1e-6; vUm += stepUm) {
@@ -674,7 +679,7 @@
         }));
         dieSvg.appendChild(svgEl('text', {
           class: 'axis-label tick-label', x: centerPx - TICK_LEN - 4, y: ty + 3, 'text-anchor': 'end',
-        })).textContent = `${sign * Math.round(vUm)}`;
+        })).textContent = `${Math.round(halfHeightUm + sign * vUm)}`;
       }
     }
     dieSvg.appendChild(svgEl('text', {
@@ -682,8 +687,12 @@
     })).textContent = 'µm';
 
     defects.forEach((rec, idx) => {
-      const px = centerPx + rec.gdsX * mmToPx;
-      const py = centerPx - rec.gdsY * mmToPx;
+      // GDS-X/GDS-Y are absolute, corner-origin coordinates (die center = dieSize/2);
+      // convert to a centered mm offset for plotting against the centered die box.
+      const gdsXCenteredMm = (rec.gdsXUm / 1000) - halfMmX;
+      const gdsYCenteredMm = (rec.gdsYUm / 1000) - halfMmY;
+      const px = centerPx + gdsXCenteredMm * mmToPx;
+      const py = centerPx - gdsYCenteredMm * mmToPx;
       const dot = svgEl('circle', { class: 'defect-dot', cx: px, cy: py, r: 5, 'data-idx': idx });
       const tipLines = [`Defect #${idx + 1}`];
       if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);
@@ -728,19 +737,20 @@
 
   /* ===================== Data-driven die size suggestion ===================== */
   // Wafer size and scribe lane have no signal in this data model (die_X/die_Y are
-  // unitless grid indices), but die size can be validated: a defect's GDS offset
-  // can never exceed half the true die size, so an offset larger than the current
-  // Die Size setting proves that setting is too small.
+  // unitless grid indices), but die size can be validated: GDS-X/GDS-Y are
+  // absolute, corner-origin coordinates within the die, so a defect's GDS value
+  // can never exceed the true die size -- a value larger than the current Die
+  // Size setting proves that setting is too small.
   function computeMinDieSizeFromData() {
     if (!state.records.length) return null;
-    let maxAbsX = 0;
-    let maxAbsY = 0;
+    let maxX = 0;
+    let maxY = 0;
     for (const rec of state.records) {
-      maxAbsX = Math.max(maxAbsX, Math.abs(rec.gdsX));
-      maxAbsY = Math.max(maxAbsY, Math.abs(rec.gdsY));
+      maxX = Math.max(maxX, Math.abs(rec.gdsXUm) / 1000);
+      maxY = Math.max(maxY, Math.abs(rec.gdsYUm) / 1000);
     }
     const roundUpToHalf = (v) => Math.max(Math.ceil(v / 0.5) * 0.5, 0.5);
-    return { minX: roundUpToHalf(maxAbsX * 2), minY: roundUpToHalf(maxAbsY * 2) };
+    return { minX: roundUpToHalf(maxX), minY: roundUpToHalf(maxY) };
   }
 
   function updateDieSizeHint() {
@@ -750,7 +760,7 @@
     const needsY = minSize.minY > state.dieSizeY + 1e-9;
     if (!needsX && !needsY) { dieSizeHint.hidden = true; return; }
     dieSizeHintText.textContent =
-      `Defects reach up to ${minSize.minX}×${minSize.minY} mm from die center — ` +
+      `Defects reach up to ${minSize.minX}×${minSize.minY} mm from the die's origin corner — ` +
       `larger than the current Die Size (${state.dieSizeX}×${state.dieSizeY} mm).`;
     dieSizeHint.dataset.suggestX = minSize.minX;
     dieSizeHint.dataset.suggestY = minSize.minY;
