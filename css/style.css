@@ -43,6 +43,13 @@
 }
 
 * { box-sizing: border-box; }
+/* Author rules that set `display` on an element (e.g. `display: flex` for a
+   flex container) otherwise beat the browser's built-in `[hidden] { display:
+   none }` rule, since author-normal styles always win over user-agent-normal
+   styles regardless of specificity. Without this, toggling `.hidden = true`
+   in JS leaves the element visually laid out (and still catching pointer
+   events) even though it's semantically hidden. */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -133,6 +140,13 @@ select:focus, input[type="number"]:focus { border-color: var(--accent); }
 .col-list { margin: 6px 0; padding-left: 18px; }
 .col-list code { font-family: var(--font-mono); color: var(--accent); }
 .error-text { color: var(--danger); font-size: 12px; margin-top: 8px; }
+.hint-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: rgba(255, 184, 77, 0.12); border: 1px solid var(--warning); border-radius: 8px;
+  padding: 8px 10px; font-size: 11.5px; color: var(--text); margin-top: -4px; margin-bottom: 12px;
+}
+.hint-row .text-btn { flex-shrink: 0; padding: 4px 10px; color: var(--warning); border-color: var(--warning); }
+.hint-row .text-btn:hover { color: var(--bg); background: var(--warning); }
 code { font-family: var(--font-mono); }
 
 .stats { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
@@ -164,7 +178,6 @@ code { font-family: var(--font-mono); }
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px; margin: 0;
 }
-.empty-state[hidden] { display: none; }
 
 .die-stage { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
 .die-svg-wrap { position: relative; }

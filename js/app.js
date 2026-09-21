@@ -40,6 +40,9 @@
   const dieSizeYInput = el('dieSizeY');
   const scribeLaneInput = el('scribeLane');
   const edgeExclusionInput = el('edgeExclusion');
+  const dieSizeHint = el('dieSizeHint');
+  const dieSizeHintText = el('dieSizeHintText');
+  const applyDieSizeSuggestion = el('applyDieSizeSuggestion');
   const notchSel = el('notchDir');
   const csvInput = el('csvInput');
   const dropzone = el('dropzone');
@@ -687,9 +690,48 @@
     renderWafer();
   });
 
+  /* ===================== Data-driven die size suggestion ===================== */
+  // Wafer size and scribe lane have no signal in this data model (die_X/die_Y are
+  // unitless grid indices), but die size can be validated: a defect's GDS offset
+  // can never exceed half the true die size, so an offset larger than the current
+  // Die Size setting proves that setting is too small.
+  function computeMinDieSizeFromData() {
+    if (!state.records.length) return null;
+    let maxAbsX = 0;
+    let maxAbsY = 0;
+    for (const rec of state.records) {
+      maxAbsX = Math.max(maxAbsX, Math.abs(rec.gdsX));
+      maxAbsY = Math.max(maxAbsY, Math.abs(rec.gdsY));
+    }
+    const roundUpToHalf = (v) => Math.max(Math.ceil(v / 0.5) * 0.5, 0.5);
+    return { minX: roundUpToHalf(maxAbsX * 2), minY: roundUpToHalf(maxAbsY * 2) };
+  }
+
+  function updateDieSizeHint() {
+    const minSize = computeMinDieSizeFromData();
+    if (!minSize) { dieSizeHint.hidden = true; return; }
+    const needsX = minSize.minX > state.dieSizeX + 1e-9;
+    const needsY = minSize.minY > state.dieSizeY + 1e-9;
+    if (!needsX && !needsY) { dieSizeHint.hidden = true; return; }
+    dieSizeHintText.textContent =
+      `Defects reach up to ${minSize.minX}×${minSize.minY} mm from die center — ` +
+      `larger than the current Die Size (${state.dieSizeX}×${state.dieSizeY} mm).`;
+    dieSizeHint.dataset.suggestX = minSize.minX;
+    dieSizeHint.dataset.suggestY = minSize.minY;
+    dieSizeHint.hidden = false;
+  }
+
+  applyDieSizeSuggestion.addEventListener('click', () => {
+    dieSizeXInput.value = dieSizeHint.dataset.suggestX;
+    dieSizeYInput.value = dieSizeHint.dataset.suggestY;
+    readInputs();
+    render();
+  });
+
   /* ===================== Render orchestration ===================== */
   function render() {
     renderWafer();
+    updateDieSizeHint();
   }
 
   /* ===================== Init ===================== */

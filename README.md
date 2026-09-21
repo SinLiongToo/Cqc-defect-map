@@ -33,6 +33,12 @@ Everything runs in the browser — the file never leaves your machine.
   list showing ECID (if present) plus every column from the CSV for that
   defect. Click any die on the wafer map to inspect it here; it starts
   auto-selected to the die with the most defects
+- **Die size validation**: since a defect's GDS offset can't exceed half the
+  true die size, the app checks loaded data against the current Die Size
+  setting and shows a suggestion banner (with a one-click Apply) if the data
+  implies a larger die than what's set. Wafer size and scribe lane can't be
+  inferred this way — there's no signal for either in typical die_X/die_Y +
+  GDS-X/Y data — so those stay manual, with sensible defaults.
 - Dark / light theme toggle (persisted locally), responsive layout for
   desktop and mobile
 
