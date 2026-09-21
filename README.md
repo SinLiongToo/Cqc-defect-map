@@ -2,8 +2,8 @@
 
 A small, static, client-side tool for visualizing semiconductor wafer defect
 data from a CSV/TSV/XLSX file: a full wafer die map with defect
-highlighting, and a second, always-visible die defect map showing exact
-in-die defect locations.
+highlighting, side by side with a composite die defect map plotting every
+defect from every die in the die's local coordinate system.
 
 Everything runs in the browser — the file never leaves your machine.
 
@@ -27,15 +27,21 @@ Everything runs in the browser — the file never leaves your machine.
   the "usable dies" count, with the ring itself drawn as a dashed circle.
   Hover a die to see its (die_X, die_Y) coordinate, defect count, ECID(s)
   if present, and edge-exclusion status
-- **Die defect map**: always-visible second view plotting each defect of the
-  selected die at its exact (GDS-X, GDS-Y) absolute coordinate, with a
-  ruler (tick marks + µm labels, labeled in absolute coordinates to match)
-  on both axes, and a hover tooltip and
-  list showing ECID (if present) plus every column from the CSV for that
-  defect. Click any die on the wafer map to inspect it here; it starts
-  auto-selected to the die with the most defects. If the selected die has
-  no recorded defects, the plot/ruler are hidden and a plain text message
-  is shown instead
+- **Die defect map**: a composite view plotting *every* defect from *every*
+  die at its exact (GDS-X, GDS-Y) absolute coordinate, in the shared
+  die-local coordinate system (all dies use the same Die Size), with a
+  ruler (tick marks + µm labels, in absolute coordinates matching the
+  tooltips) on both axes — useful for spotting systematic vs. random defect
+  clustering across the whole wafer. Click a die on the wafer map to
+  highlight that die's own points (larger, full color) against everything
+  else (small, dimmed); the defect list to the right of the plot stays
+  scoped to the highlighted die, with its own hover tooltips. Starts
+  auto-highlighted on the die with the most defects; "Clear selection"
+  drops the highlight but keeps the composite plot visible. The two maps
+  sit side by side on wide screens (≥1200px) and stack on narrower ones
+- On wide screens, side-by-side maps means the die defect map's own plot +
+  list also stack (rather than sitting side by side) between ~1200–1599px,
+  where there isn't room for both; at ≥1600px there's room for everything
 - **Wafer center offset**: a die index offset (X/Y) that shifts which
   physical die the wafer's geometric center maps to, in case a fab's die
   numbering doesn't put the wafer center at the simple auto-computed
@@ -65,14 +71,16 @@ Everything runs in the browser — the file never leaves your machine.
 ## Usage
 
 1. Open `index.html` (locally, or via the GitHub Pages URL above).
-2. Set **Wafer Size**, **Die Size X/Y**, and **Notch Direction** to match your data.
-3. Upload your defect file (CSV, TSV, or XLSX). For text files, if it
-   doesn't look right, check **File Encoding** — it's auto-set when a BOM
-   is detected, otherwise pick the encoding your export tool used and it
-   re-parses immediately. For XLSX workbooks with multiple sheets, pick the
-   right one from **Sheet**.
-4. Hover dies on the wafer map to inspect coordinates; click a die to see its
-   defects in the die defect map below.
+2. Upload your defect file (CSV, TSV, or XLSX) at the top of the sidebar.
+   For text files, if it doesn't look right, check **File Encoding** —
+   it's auto-set when a BOM is detected, otherwise pick the encoding your
+   export tool used and it re-parses immediately. For XLSX workbooks with
+   multiple sheets, pick the right one from **Sheet**.
+3. Set **Wafer Size**, **Die Size X/Y**, and **Notch Direction** to match
+   your data (before or after uploading — both work).
+4. Hover dies on the wafer map to inspect coordinates; click a die to
+   highlight its defects in the die defect map (side by side, or below it
+   on narrower screens).
 
 ## File format
 

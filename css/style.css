@@ -162,6 +162,16 @@ code { font-family: var(--font-mono); }
 
 /* ===================== Content ===================== */
 .content { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+@media (min-width: 1200px) {
+  .content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+/* Between 1200-1599px the two maps are already side by side, leaving each
+   die-stage too narrow to also fit its SVG and defect list side by side --
+   stack them there; wide screens (>=1600px) have room for both. */
+@media (min-width: 1200px) and (max-width: 1599px) {
+  .die-stage { grid-template-columns: 1fr; }
+  .die-defect-list { max-height: 280px; }
+}
 .stage-card {
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 18px; min-width: 0;
@@ -188,7 +198,7 @@ code { font-family: var(--font-mono); }
   text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px; margin: 0;
 }
 
-.die-stage { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+.die-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px); gap: 16px; align-items: start; }
 .die-svg-wrap { position: relative; }
 #dieSvg { width: 100%; height: auto; background: var(--bg-inset); border-radius: 10px; border: 1px solid var(--border-soft); }
 .die-defect-list { max-height: 480px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
@@ -207,8 +217,11 @@ code { font-family: var(--font-mono); }
 .wafer-circle { fill: none; stroke: var(--border); stroke-width: 2; }
 .exclusion-ring { fill: none; stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 5 4; opacity: 0.7; }
 .notch-mark { fill: var(--bg); stroke: var(--border); stroke-width: 1.5; }
-.defect-dot { fill: var(--accent-2); stroke: var(--bg); stroke-width: 1; cursor: pointer; }
+.defect-dot { fill: var(--accent-2); stroke: var(--bg); stroke-width: 1; cursor: default; transition: r 0.1s ease; }
 .defect-dot:hover { filter: brightness(1.4); r: 7; }
+.defect-dot.highlighted { fill: var(--accent-2); stroke: var(--bg); stroke-width: 1.5; opacity: 1; }
+.defect-dot.dimmed { fill: var(--text-muted); stroke: none; opacity: 0.4; }
+.defect-dot.dimmed:hover { opacity: 0.85; }
 .die-outline { fill: var(--bg-inset); stroke: var(--border-soft); stroke-width: 1.5; }
 .axis-line { stroke: var(--border-soft); stroke-width: 1; stroke-dasharray: 4 4; }
 .axis-label { fill: var(--text-muted); font-family: var(--font-mono); font-size: 10px; }

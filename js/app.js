@@ -695,8 +695,13 @@
     dieSvg.innerHTML = '';
     dieDefectList.innerHTML = '';
 
-    if (!defects.length) {
-      dieEmptyState.textContent = `Die (${dieX}, ${dieY}) has no recorded defects.`;
+    // Composite view: every defect from every die is plotted (all dies share
+    // the same Die Size, so they all fit the same box); only the selected
+    // die's own points are drawn highlighted, hooked up via wafer map clicks
+    // by the caller. Hidden only if nothing anywhere has a plottable location.
+    const anyPlottable = state.records.some((r) => r.gdsXUm !== null && r.gdsYUm !== null);
+    if (!anyPlottable) {
+      dieEmptyState.textContent = 'No defects have a GDS-X/GDS-Y location to plot.';
       dieEmptyState.hidden = false;
       return;
     }
@@ -768,32 +773,60 @@
       class: 'axis-label tick-label', x: centerPx - dieW / 2 + 4, y: centerPx - dieH / 2 + 12,
     })).textContent = 'µm';
 
+    // Plot every plottable defect from every die. When a die is selected, its
+    // own points are drawn on top, larger and in the accent color, while
+    // everything else is dimmed for pattern context. With no selection, every
+    // dot is drawn the same (no dimming) since nothing is being emphasized.
+    const hasSelection = dieX !== undefined && dieX !== null;
+    const isSelectedRec = (rec) => hasSelection && rec.dieX === dieX && rec.dieY === dieY;
+    const plotOrder = state.records
+      .filter((rec) => rec.gdsXUm !== null && rec.gdsYUm !== null)
+      .sort((a, b) => Number(isSelectedRec(a)) - Number(isSelectedRec(b))); // selected drawn last (on top)
+
+    for (const rec of plotOrder) {
+      const selected = isSelectedRec(rec);
+      // GDS-X/GDS-Y are absolute, corner-origin coordinates (die center =
+      // dieSize/2, nudged by the GDS Origin Offset calibration); convert to a
+      // centered mm offset for plotting against the centered die box.
+      const gdsXCenteredMm = (rec.gdsXUm - assumedCenterXUm) / 1000;
+      const gdsYCenteredMm = (rec.gdsYUm - assumedCenterYUm) / 1000;
+      const px = centerPx + gdsXCenteredMm * mmToPx;
+      const py = centerPx - gdsYCenteredMm * mmToPx;
+      const dotClass = !hasSelection ? 'defect-dot' : (selected ? 'defect-dot highlighted' : 'defect-dot dimmed');
+      const dot = svgEl('circle', {
+        class: dotClass, cx: px, cy: py, r: !hasSelection ? 4 : (selected ? 5 : 3),
+      });
+      const tipLines = [`Die (${rec.dieX}, ${rec.dieY})`];
+      if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);
+      tipLines.push(`GDS-X: ${rec.gdsXUm} µm`, `GDS-Y: ${rec.gdsYUm} µm`);
+      for (const [k, v] of Object.entries(rec.raw)) tipLines.push(`${k}: ${v}`);
+      const tipText = tipLines.join('\n');
+      dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
+      dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
+      dot.addEventListener('mouseleave', hideTooltip);
+      dieSvg.appendChild(dot);
+    }
+
+    // Defect list stays scoped to the selected die only.
+    if (!hasSelection) {
+      const p = document.createElement('p');
+      p.className = 'muted small';
+      p.textContent = 'Click a die on the wafer map to see its defect list.';
+      dieDefectList.appendChild(p);
+      return;
+    }
+    if (!defects.length) {
+      const p = document.createElement('p');
+      p.className = 'muted small';
+      p.textContent = `Die (${dieX}, ${dieY}) has no recorded defects.`;
+      dieDefectList.appendChild(p);
+      return;
+    }
+
     defects.forEach((rec, idx) => {
       const hasGds = rec.gdsXUm !== null && rec.gdsYUm !== null;
       const gdsXText = hasGds ? `${rec.gdsXUm} µm` : 'N/A';
       const gdsYText = hasGds ? `${rec.gdsYUm} µm` : 'N/A';
-
-      // A defect with no GDS-X/GDS-Y (blank in the source file) can't be placed
-      // on the plot -- it's still listed below, just without a dot or position.
-      if (hasGds) {
-        // GDS-X/GDS-Y are absolute, corner-origin coordinates (die center =
-        // dieSize/2, nudged by the GDS Origin Offset calibration); convert to a
-        // centered mm offset for plotting against the centered die box.
-        const gdsXCenteredMm = (rec.gdsXUm - assumedCenterXUm) / 1000;
-        const gdsYCenteredMm = (rec.gdsYUm - assumedCenterYUm) / 1000;
-        const px = centerPx + gdsXCenteredMm * mmToPx;
-        const py = centerPx - gdsYCenteredMm * mmToPx;
-        const dot = svgEl('circle', { class: 'defect-dot', cx: px, cy: py, r: 5, 'data-idx': idx });
-        const tipLines = [`Defect #${idx + 1}`];
-        if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);
-        tipLines.push(`GDS-X: ${gdsXText}`, `GDS-Y: ${gdsYText}`);
-        for (const [k, v] of Object.entries(rec.raw)) tipLines.push(`${k}: ${v}`);
-        const tipText = tipLines.join('\n');
-        dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
-        dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
-        dot.addEventListener('mouseleave', hideTooltip);
-        dieSvg.appendChild(dot);
-      }
 
       const row = document.createElement('div');
       row.className = 'defect-row';
@@ -821,11 +854,15 @@
 
   closeDieCard.addEventListener('click', () => {
     state.selectedDie = null;
-    dieCardTitle.textContent = '–';
-    dieSvg.innerHTML = '';
-    dieDefectList.innerHTML = '';
-    dieEmptyState.textContent = DIE_EMPTY_DEFAULT_TEXT;
-    dieEmptyState.hidden = false;
+    dieCardTitle.textContent = 'All dies';
+    if (state.records.length) {
+      renderDieDetail([], undefined, undefined);
+    } else {
+      dieSvg.innerHTML = '';
+      dieDefectList.innerHTML = '';
+      dieEmptyState.textContent = DIE_EMPTY_DEFAULT_TEXT;
+      dieEmptyState.hidden = false;
+    }
     renderWafer();
   });
 
@@ -887,10 +924,14 @@
   function render() {
     renderWafer();
     updateDieSizeHint();
-    if (state.selectedDie) {
-      const { x, y } = state.selectedDie;
-      const defects = state.defectsByDie.get(`${x},${y}`) || [];
-      renderDieDetail(defects, x, y);
+    if (state.records.length) {
+      if (state.selectedDie) {
+        const { x, y } = state.selectedDie;
+        const defects = state.defectsByDie.get(`${x},${y}`) || [];
+        renderDieDetail(defects, x, y);
+      } else {
+        renderDieDetail([], undefined, undefined);
+      }
     }
   }
 
