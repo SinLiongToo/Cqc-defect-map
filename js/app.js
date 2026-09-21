@@ -283,14 +283,15 @@
     for (const row of rows) {
       const dieX = Number(row[dieXCol]);
       const dieY = Number(row[dieYCol]);
-      const gdsX = Number(row[gdsXCol]);
-      const gdsY = Number(row[gdsYCol]);
-      if (!Number.isFinite(dieX) || !Number.isFinite(dieY) || !Number.isFinite(gdsX) || !Number.isFinite(gdsY)) {
+      const gdsXUm = Number(row[gdsXCol]);
+      const gdsYUm = Number(row[gdsYCol]);
+      if (!Number.isFinite(dieX) || !Number.isFinite(dieY) || !Number.isFinite(gdsXUm) || !Number.isFinite(gdsYUm)) {
         continue; // skip malformed rows
       }
       const raw = {};
       for (const col of extraCols) raw[col] = row[col];
-      records.push({ dieX, dieY, gdsX, gdsY, raw });
+      // GDS-X/GDS-Y are given in micrometers; convert to mm (matches die size units) for plotting.
+      records.push({ dieX, dieY, gdsXUm, gdsYUm, gdsX: gdsXUm / 1000, gdsY: gdsYUm / 1000, raw });
     }
 
     if (!records.length) {
@@ -364,6 +365,9 @@
     const maxJ = Math.ceil(radiusMm / dieSizeY) + 1;
     const dies = [];
 
+    // die_X/die_Y in the CSV are non-negative (first-quadrant indexing), with the
+    // wafer center falling at index (maxI, maxJ) — i.e. index 0 is the corner of
+    // the theoretical grid's bounding square, not the wafer center itself.
     for (let i = -maxI; i <= maxI; i++) {
       for (let j = -maxJ; j <= maxJ; j++) {
         const cx = i * dieSizeX;
@@ -375,7 +379,7 @@
         const closestY = Math.max(cy - halfY, Math.min(0, cy + halfY));
         const dist = Math.hypot(closestX, closestY);
         if (dist <= radiusMm) {
-          dies.push({ i, j, cx, cy });
+          dies.push({ i: i + maxI, j: j + maxJ, cx, cy });
         }
       }
     }
@@ -532,7 +536,7 @@
       const px = centerPx + rec.gdsX * mmToPx;
       const py = centerPx - rec.gdsY * mmToPx;
       const dot = svgEl('circle', { class: 'defect-dot', cx: px, cy: py, r: 5, 'data-idx': idx });
-      const tipLines = [`Defect #${idx + 1}`, `GDS-X: ${rec.gdsX} mm`, `GDS-Y: ${rec.gdsY} mm`];
+      const tipLines = [`Defect #${idx + 1}`, `GDS-X: ${rec.gdsXUm} µm`, `GDS-Y: ${rec.gdsYUm} µm`];
       for (const [k, v] of Object.entries(rec.raw)) tipLines.push(`${k}: ${v}`);
       const tipText = tipLines.join('\n');
       dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
@@ -542,7 +546,7 @@
 
       const row = document.createElement('div');
       row.className = 'defect-row';
-      let rowHtml = `<div><span class="k">GDS-X</span><span>${rec.gdsX} mm</span></div><div><span class="k">GDS-Y</span><span>${rec.gdsY} mm</span></div>`;
+      let rowHtml = `<div><span class="k">GDS-X</span><span>${rec.gdsXUm} µm</span></div><div><span class="k">GDS-Y</span><span>${rec.gdsYUm} µm</span></div>`;
       for (const [k, v] of Object.entries(rec.raw)) {
         rowHtml += `<div><span class="k">${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></div>`;
       }

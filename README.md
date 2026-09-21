@@ -50,10 +50,10 @@ so any of the listed aliases work, for either format:
 
 | Meaning | Accepted column names | Notes |
 |---|---|---|
-| Die column index | `die_X`, `X coordinate` | integer grid index of the die on the wafer (not mm) |
-| Die row index | `die_Y`, `Y coordinate` | integer grid index of the die on the wafer |
-| Defect X offset | `GDS-X` | in **mm, relative to the die center** |
-| Defect Y offset | `GDS-Y` | in **mm, relative to the die center** |
+| Die column index | `die_X`, `X coordinate` | non-negative integer grid index of the die on the wafer (not mm) |
+| Die row index | `die_Y`, `Y coordinate` | non-negative integer grid index of the die on the wafer |
+| Defect X offset | `GDS-X` | in **µm, relative to the die center** |
+| Defect Y offset | `GDS-Y` | in **µm, relative to the die center** |
 
 Any additional columns (defect class, size, ID, etc.) are preserved and shown
 in the defect tooltip and detail list in the die defect map — no fixed
@@ -78,24 +78,33 @@ loads by default and switching sheets re-parses without re-uploading.
 Sample files are provided at
 [`sample-data/sample_defects.csv`](sample-data/sample_defects.csv) and
 [`sample-data/sample_defects.xlsx`](sample-data/sample_defects.xlsx) — the
-same data in both formats (12", 5mm x 5mm die — the UI's default settings).
+same data in both formats (12", 5mm x 5mm die — the UI's default settings;
+note the die indices are centered around 31 to match the first-quadrant
+convention below).
 
 ## Assumptions / conventions
 
 - **Wafer diameter**: 8" → 200 mm, 12" → 300 mm (standard nominal fab sizes,
   not a literal inch-to-mm conversion).
-- **Die grid origin**: die index `(0, 0)` is centered at the wafer center;
-  a die's physical center is `(die_X * dieSizeX, die_Y * dieSizeY)` mm. A die
-  is drawn if any part of its footprint overlaps the wafer circle (so partial
-  edge dies are included, matching typical wafer map tools).
+- **Die grid origin (first quadrant)**: `die_X`/`die_Y` are non-negative,
+  0-based indices into the theoretical grid's bounding square — die
+  `(0, 0)` is the grid's corner, not the wafer center. The wafer center
+  falls at index `(centerX, centerY)`, where `centerX`/`centerY` are
+  auto-computed as half the total die columns/rows spanning the wafer
+  diameter (`ceil(waferRadius / dieSizeX) + 1`, and likewise for Y). A
+  die's physical center relative to the wafer center is therefore
+  `((die_X - centerX) * dieSizeX, (die_Y - centerY) * dieSizeY)` mm. A die
+  is drawn if any part of its footprint overlaps the wafer circle (so
+  partial edge dies are included, matching typical wafer map tools).
 - **Notch direction**: rotates the entire wafer map (circle + die grid +
   notch mark) in 90° steps — Down = 0°, Right = 90°, Up = 180°, Left = 270°
   (clockwise) — as a visual/orientation reference. It does not remap which
   die index is which; it only changes where the notch appears relative to
   the fixed die grid.
-- **Defect location**: `GDS-X`/`GDS-Y` are plotted in mm relative to the
+- **Defect location**: `GDS-X`/`GDS-Y` are given in **µm**, relative to the
   center of their die, so values should generally fall within
-  `[-dieSizeX/2, dieSizeX/2]` and `[-dieSizeY/2, dieSizeY/2]`.
+  `[-dieSizeX/2, dieSizeX/2]` and `[-dieSizeY/2, dieSizeY/2]` once converted
+  to mm (i.e. `±2500 µm` for a 5mm die).
 
 ## Tech
 
