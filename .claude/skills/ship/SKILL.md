@@ -21,8 +21,13 @@ actual headless browser, not by reading the diff.
 
 Make the change in `index.html`, `css/style.css`, and/or `js/app.js`. Keep it scoped to
 what was asked — this app has accumulated a lot of surface area (wafer map, die defect map,
-Full View modal, rotation, grid lines, calibration) and it's easy to reach for an
-abstraction it doesn't need yet.
+Pareto chart, Trend chart, a shared Full View modal every plot can open into, rotation, grid
+lines, calibration) and it's easy to reach for an abstraction it doesn't need yet.
+
+If the change adds a new plot/card, give it a Full View icon button too (see how the
+existing four wire into the shared `openFullView(cardEl, elements, title)` helper in
+`js/app.js`) — "every plot gets a full-view button" is an established expectation now, not
+a one-off.
 
 ## 2. Verify with headless Playwright
 
@@ -77,7 +82,21 @@ console.log('braces', o, c, o===c?'OK':'MISMATCH');
 "
 ```
 
-## 5. Commit
+## 5. Bump the version
+
+Update `APP_VERSION` and `APP_UPDATED` near the top of `js/app.js` (they drive the
+version/updated-date line in the page footer). There's no build step to derive either
+automatically, so this is a manual edit every time, not something to skip because the change
+feels small. Get the real current date/time rather than guessing:
+
+```bash
+date "+%Y-%m-%d %H:%M (UTC%z)"
+```
+
+Bump the version by simple judgment, not strict semver ritual: patch-level for a fix, minor
+for a new feature/plot, and don't overthink it beyond that.
+
+## 6. Commit
 
 ```bash
 git status   # confirm only the files you meant to touch changed
@@ -97,27 +116,52 @@ End every commit message with:
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 ```
 
-## 6. Push
+## 7. Push
 
 ```bash
 git push
 ```
 
-## 7. Confirm the deploy
+## 8. Confirm the deploy
 
-Use the `Monitor` tool (not a manual sleep-poll loop) to watch the build:
+This repo's Pages source is set to "deploy from a branch," but GitHub actually serves it
+through an auto-generated Actions workflow called `pages build and deployment` — **not** the
+legacy Jekyll build pipeline. `gh api repos/SinLiongToo/Cqc-defect-map/pages/builds/latest`
+queries that legacy pipeline and has been observed reporting `"errored"` for commits that
+the real Actions deployment built and served just fine seconds later — don't use it, and
+don't trust it if you see it fail. Check the real thing instead:
 
 ```bash
-until s=$(gh api repos/SinLiongToo/Cqc-defect-map/pages/builds/latest --jq '.status' 2>&1); do sleep 3; done
-echo "status=$s"
-while [ "$s" = "queued" ] || [ "$s" = "building" ]; do
-  sleep 5
-  s=$(gh api repos/SinLiongToo/Cqc-defect-map/pages/builds/latest --jq '.status')
-  echo "status=$s"
-done
+git rev-parse HEAD   # the exact SHA you just pushed
+gh run list --workflow=pages-build-deployment --limit 1 --json headSha,status,conclusion
 ```
 
-## 8. Report back
+Wait for `status` to reach `"completed"` **for that exact SHA** (not just "the latest run" —
+if you push twice in quick succession, an older SHA's run can show `"cancelled"` when a
+newer push superseded it, which is normal, not a failure). Use a single-shot wait, not a
+polling `Monitor` that echoes on every loop iteration regardless of whether anything changed
+— that spams duplicate "still building" notifications. `Bash` with `run_in_background` and
+an `until` loop gives exactly one notification, when the condition is actually met:
+
+```bash
+until run=$(gh run list --workflow=pages-build-deployment --limit 1 --json headSha,status,conclusion 2>&1) && \
+  sha=$(echo "$run" | grep -o '"headSha":"[^"]*"' | head -1 | cut -d'"' -f4) && \
+  status=$(echo "$run" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4) && \
+  [ "$sha" = "<the SHA from git rev-parse HEAD>" ] && [ "$status" = "completed" ]; do
+  sleep 5
+done
+echo "$run"
+```
+
+Then verify the live site actually served it, rather than trusting a green status alone —
+`curl` for a distinctive string you just added:
+
+```bash
+curl -s "https://sinliongtoo.github.io/Cqc-defect-map/js/app.js" | grep -o '<something unique to this change>'
+gh api repos/SinLiongToo/Cqc-defect-map/deployments --jq '.[0] | {sha, created_at}'
+```
+
+## 9. Report back
 
 Tell the user, concisely: the live URL (https://sinliongtoo.github.io/Cqc-defect-map/),
 what changed, and what was verified. If you found and fixed an incidental bug along the way

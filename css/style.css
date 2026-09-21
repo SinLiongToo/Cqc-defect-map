@@ -267,7 +267,7 @@ code { font-family: var(--font-mono); }
   box-shadow: var(--shadow); max-width: 260px; white-space: pre-line;
 }
 
-.app-footer { text-align: center; padding: 14px; border-top: 1px solid var(--border); }
+.app-footer { display: flex; flex-direction: column; gap: 4px; text-align: center; padding: 14px; border-top: 1px solid var(--border); }
 
 /* ===================== Modals ===================== */
 .modal-overlay {
@@ -290,8 +290,12 @@ code { font-family: var(--font-mono); }
 .modal-body h3:first-child { margin-top: 0; }
 .guide-list { padding-left: 20px; margin: 0; display: flex; flex-direction: column; gap: 8px; color: var(--text-muted); }
 .guide-list strong { color: var(--text); }
-#fullViewBody .die-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 300px); }
-#fullViewBody #dieSvg { max-height: 80vh; }
+#fullViewBody .die-stage, #fullViewBody .pareto-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 300px); }
+#fullViewBody #dieSvg, #fullViewBody #waferSvg, #fullViewBody #paretoSvg, #fullViewBody #trendSvg { max-height: 80vh; }
+/* #waferSvg is capped to 640px normally so it doesn't dominate the page at
+   its usual in-line size -- that cap defeats the purpose of full view, so
+   it's lifted here. The other plots' SVGs have no such cap to begin with. */
+#fullViewBody #waferSvg { max-width: none; }
 
 /* ===================== Responsive ===================== */
 .sidebar-backdrop { display: none; }

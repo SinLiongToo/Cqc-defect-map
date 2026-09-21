@@ -118,15 +118,19 @@ Everything runs in the browser — the file never leaves your machine.
   isn't known. Beyond 12 points, most x-axis text labels are thinned out to
   stay legible; every point is still plotted and shows its exact date/count
   on hover.
-- **Full view**: an icon on the die defect map's header opens it in a large
-  modal (same live SVG and defect list, just reparented and sized bigger —
-  no data or interactivity lost) for closer inspection of the defect
-  pattern. Still scoped to whichever die is highlighted, same as inline.
+- **Full view**: every plot — wafer map, die defect map, Pareto chart, and
+  Trend chart — has its own icon in its header that opens it in a large
+  shared modal (the same live SVG/list elements are reparented in and back
+  out on close, not cloned, so no data, state, or interactivity is ever
+  lost). Still scoped/filtered exactly the same as inline; just bigger.
 - **User guide**: a help icon in the top bar opens a modal with a quick
   getting-started walkthrough and the full file format reference (moved
   out of the sidebar to keep it uncluttered).
 - Dark / light theme toggle (persisted locally), responsive layout for
   desktop and mobile
+- **Version footer**: the page footer shows the app's version and when it
+  was last updated, bumped by hand on each release (there's no build step
+  to derive it automatically).
 
 ## Usage
 
@@ -144,9 +148,10 @@ Everything runs in the browser — the file never leaves your machine.
    highlight just that one defect. Ctrl/Cmd/Shift-click (or -drag a box) on
    either map adds more to the selection instead of replacing it; click
    empty space to clear the whole selection.
-5. Click the full-view icon on the die defect map's header to inspect the
-   pattern at a larger size, or the help icon in the top bar for a
-   walkthrough and the file format reference at any time.
+5. Click the full-view icon in any plot's header (wafer map, die defect
+   map, Pareto chart, Trend chart) to inspect it at a larger size, or the
+   help icon in the top bar for a walkthrough and the file format reference
+   at any time.
 6. Scroll down to the **Pareto Chart** and pick any column from the
    dropdown to see which of its values dominate across every loaded defect;
    the **Trend Chart** beside it does the same over time, for any column
@@ -287,3 +292,11 @@ npx serve .
 
 This repo is deployed with GitHub Pages, serving directly from the `main`
 branch root.
+
+## Versioning
+
+`APP_VERSION` and `APP_UPDATED` near the top of `js/app.js` drive the
+version/updated-date line in the page footer. There's no build step to
+derive either automatically, so they're bumped by hand as part of shipping
+any change — see the `ship` skill (`.claude/skills/ship/SKILL.md`), which
+includes this as one of its steps.

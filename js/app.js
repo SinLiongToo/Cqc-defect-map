@@ -2,6 +2,11 @@
   'use strict';
 
   /* ===================== Constants ===================== */
+  // Bumped by hand on each ship (see the "ship" skill) -- there's no build
+  // step to derive this from automatically, so it's the one thing that has
+  // to be remembered and edited alongside a release rather than computed.
+  const APP_VERSION = 'v1.0.0';
+  const APP_UPDATED = '2026-09-22 01:54 (UTC+8)';
   const WAFER_DIAMETER_MM = { 8: 200, 12: 300 };
   const NOTCH_ANGLE_DEG = { down: 0, right: 90, up: 180, left: 270 };
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -114,6 +119,8 @@
   const waferEmptyState = el('waferEmptyState');
   const waferStage = el('waferStage');
   const waferSelectionBox = el('waferSelectionBox');
+  const waferCard = el('waferCard');
+  const waferFullViewBtn = el('waferFullViewBtn');
   const dieCard = el('dieCard');
   const dieCardTitle = el('dieCardTitle');
   const dieSvg = el('dieSvg');
@@ -144,15 +151,23 @@
   const fullViewBtn = el('fullViewBtn');
   const fullViewModal = el('fullViewModal');
   const fullViewBody = el('fullViewBody');
+  const fullViewTitle = el('fullViewTitle');
   const closeFullView = el('closeFullView');
+  const paretoCard = el('paretoCard');
   const paretoColumnSelect = el('paretoColumnSelect');
   const paretoSvg = el('paretoSvg');
   const paretoEmptyState = el('paretoEmptyState');
   const paretoList = el('paretoList');
+  const paretoStage = el('paretoStage');
+  const paretoFullViewBtn = el('paretoFullViewBtn');
+  const trendCard = el('trendCard');
   const trendColumnSelect = el('trendColumnSelect');
   const trendSvg = el('trendSvg');
   const trendEmptyState = el('trendEmptyState');
   const trendExcludedNote = el('trendExcludedNote');
+  const trendSvgWrap = el('trendSvgWrap');
+  const trendFullViewBtn = el('trendFullViewBtn');
+  const appVersionInfo = el('appVersionInfo');
 
   /* ===================== Modals ===================== */
   function openModal(modal) { modal.hidden = false; }
@@ -162,16 +177,28 @@
   closeHelpModal.addEventListener('click', () => closeModal(helpModal));
   helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeModal(helpModal); });
 
-  fullViewBtn.addEventListener('click', () => {
-    fullViewBody.appendChild(dieToolbar);
-    fullViewBody.appendChild(dieStage);
+  // One shared modal serves every plot's "full view" (only one can be open
+  // at a time anyway) -- fullViewReturn remembers where to put the borrowed
+  // elements back when it closes, since they're moved (not cloned), so the
+  // originals keep their live SVG/state and event listeners either way.
+  let fullViewReturn = null;
+  function openFullView(cardEl, elements, title) {
+    fullViewReturn = { parent: cardEl, elements };
+    fullViewTitle.textContent = title;
+    for (const node of elements) fullViewBody.appendChild(node);
     openModal(fullViewModal);
-  });
+  }
   function exitFullView() {
-    dieCard.appendChild(dieToolbar);
-    dieCard.appendChild(dieStage);
+    if (fullViewReturn) {
+      for (const node of fullViewReturn.elements) fullViewReturn.parent.appendChild(node);
+      fullViewReturn = null;
+    }
     closeModal(fullViewModal);
   }
+  waferFullViewBtn.addEventListener('click', () => openFullView(waferCard, [waferStage], 'Wafer Map — Full View'));
+  fullViewBtn.addEventListener('click', () => openFullView(dieCard, [dieToolbar, dieStage], 'Die Defect Map — Full View'));
+  paretoFullViewBtn.addEventListener('click', () => openFullView(paretoCard, [paretoStage], 'Pareto Chart — Full View'));
+  trendFullViewBtn.addEventListener('click', () => openFullView(trendCard, [trendSvgWrap, trendExcludedNote], 'Trend Chart — Full View'));
   closeFullView.addEventListener('click', exitFullView);
   fullViewModal.addEventListener('click', (e) => { if (e.target === fullViewModal) exitFullView(); });
 
@@ -1672,6 +1699,7 @@
   }
 
   /* ===================== Init ===================== */
+  appVersionInfo.textContent = `Version ${APP_VERSION} · Updated ${APP_UPDATED}`;
   initTheme();
   render();
 })();
