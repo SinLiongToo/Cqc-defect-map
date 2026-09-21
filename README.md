@@ -83,20 +83,34 @@ Everything runs in the browser — the file never leaves your machine.
   offset fields by hand releases that lock. Tooltips and the ruler still
   show/label the real values from the file; only the plotted position
   shifts.
-- **Pareto chart**: a full-width chart below the two maps that counts how
-  often each value of *any* loaded column occurs — pick the column from the
-  **Column** dropdown (every die_X/die_Y/GDS-X/GDS-Y/ECID field plus every
-  extra column in the file is offered; defaults to the first extra column,
-  since that's most often a defect classification). Bars are sorted most-
-  to-least common with a cumulative-percentage line overlaid, and a dashed
-  80% reference line marks the classic "vital few" cutoff — bars up to that
-  point are highlighted, the rest dimmed. Beyond 15 distinct values the tail
-  is collapsed into a single "Others (N values)" bucket so the chart and its
-  labels stay readable; hovering a bar (or its label) shows the exact count,
-  percentage, and cumulative percentage, and the same numbers are listed
-  beside the chart. Always reflects every loaded defect regardless of
-  what's selected on the wafer/die maps — it answers "what dominates
-  overall," not "what's in the current selection."
+- **Pareto chart**: below the two maps, counts how often each value of *any*
+  loaded column occurs — pick the column from the **Column** dropdown (every
+  die_X/die_Y/GDS-X/GDS-Y/ECID field plus every extra column in the file is
+  offered; defaults to the first extra column, since that's most often a
+  defect classification). Bars are sorted most-to-least common with a
+  cumulative-percentage line overlaid, and a dashed 80% reference line marks
+  the classic "vital few" cutoff — bars up to that point are highlighted,
+  the rest dimmed. Beyond 15 distinct values the tail is collapsed into a
+  single "Others (N values)" bucket so the chart and its labels stay
+  readable; hovering a bar (or its label) shows the exact count, percentage,
+  and cumulative percentage, and the same numbers are listed beside the
+  chart. Always reflects every loaded defect regardless of what's selected
+  on the wafer/die maps — it answers "what dominates overall," not "what's
+  in the current selection."
+  **Group by** (optional, defaults to off): pick a second column to split
+  each bar into a stacked breakdown by that column's values — e.g. Pareto
+  of `defect_class`, each bar broken down by `equipment`. Up to 8 distinct
+  values get their own color (a validated, colorblind-safe categorical
+  palette, checked against this app's actual light/dark chart backgrounds);
+  beyond that, the rest collapse into a shared gray "Other" segment rather
+  than inventing more colors. A given value always gets the same color
+  everywhere on the chart, regardless of which bar it appears in. A legend
+  appears whenever 2+ series are shown, and every bar's exact per-segment
+  counts are also listed in the panel beside the chart — color is never the
+  only way to read a value. The "vital few" highlighting still applies on
+  top, as an opacity difference, independent of the segment colors — it
+  answers "does this whole bar matter" while the colors answer "what's it
+  made of."
 - **Trend chart**: sits beside the Pareto chart, counting defect rows per
   date. The **Date column** dropdown only offers columns whose header
   contains "date" (case-insensitive) — if none exist, it's disabled with an

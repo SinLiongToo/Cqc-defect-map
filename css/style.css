@@ -23,6 +23,21 @@
   --radius: 14px;
   --font-ui: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  /* Categorical series palette for the Pareto chart's "Group by" stacked
+     segments (up to 8 distinct values; a 9th folds into a shared "Other"
+     segment in --text-muted rather than generating a color). Validated with
+     the dataviz skill's palette validator against this app's actual dark
+     chart surface (--bg-inset #0d131b): CVD-safe adjacent-pair separation
+     and >=3:1 contrast on all 8 steps. Fixed hue order is the safety
+     mechanism -- never reorder or cycle it per-chart. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
 }
 
 :root[data-theme="light"] {
@@ -46,6 +61,19 @@
   --die-empty-fill: #e6ecf3;
   --die-empty-stroke: #c7d3e0;
   --shadow: 0 16px 40px rgba(20, 30, 50, 0.12);
+  /* Same 8 hues, light-mode steps -- validated against this app's actual
+     light chart surface (--bg-inset #f4f7fb). Four steps sit below 3:1
+     contrast by design (orange/aqua/yellow/magenta); the Pareto chart's
+     legend and defect list always carry the value in text, so color is
+     never the only way to read a segment (dataviz skill's "relief rule"). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
 }
 
 * { box-sizing: border-box; }
@@ -226,10 +254,19 @@ code { font-family: var(--font-mono); }
 }
 .defect-row div { display: flex; justify-content: space-between; gap: 8px; }
 .defect-row span.k { color: var(--text-muted); }
-#paretoColumnSelect { min-width: 140px; }
+#paretoColumnSelect, #paretoGroupSelect { min-width: 140px; }
 .pareto-row-head, .pareto-row-sub { display: flex; justify-content: space-between; gap: 8px; }
 .pareto-row-sub { color: var(--text-muted); margin-top: 2px; }
 .pareto-row.vital { border-color: var(--accent-2); }
+.pareto-row-groups { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-soft); }
+.pareto-row-group { display: flex; align-items: center; gap: 5px; color: var(--text-muted); }
+/* Legend: the dependable identity channel for a grouped Pareto's >=2 series
+   -- text carries the value (never the colored text itself), a swatch
+   beside it carries the color identity. Lives inside .pareto-svg-wrap so it
+   travels into Full View along with the chart. */
+.pareto-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px; }
+.pareto-legend-item { display: flex; align-items: center; gap: 6px; }
+.pareto-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; display: inline-block; }
 .pareto-bar { cursor: pointer; transition: filter 0.15s ease; }
 .pareto-bar:hover { filter: brightness(1.3); }
 .pareto-line, .trend-line { fill: none; stroke-width: 2; }

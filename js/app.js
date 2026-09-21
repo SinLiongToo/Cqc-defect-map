@@ -5,8 +5,8 @@
   // Bumped by hand on each ship (see the "ship" skill) -- there's no build
   // step to derive this from automatically, so it's the one thing that has
   // to be remembered and edited alongside a release rather than computed.
-  const APP_VERSION = 'v1.0.0';
-  const APP_UPDATED = '2026-09-22 01:54 (UTC+8)';
+  const APP_VERSION = 'v1.1.0';
+  const APP_UPDATED = '2026-09-22 02:22 (UTC+8)';
   const WAFER_DIAMETER_MM = { 8: 200, 12: 300 };
   const NOTCH_ANGLE_DEG = { down: 0, right: 90, up: 180, left: 270 };
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -65,6 +65,7 @@
     extraColumns: [],  // headers not recognized as dieX/dieY/gdsX/gdsY/ecid
     paretoColumns: [], // all headers, in file order, offered by the Pareto column select
     paretoColumn: null, // currently selected header for the Pareto chart
+    paretoGroupColumn: '', // currently selected header to stack/split each Pareto bar by; '' = no grouping
     trendColumns: [],   // headers whose name contains "date" (case-insensitive), offered by the Trend chart
     trendColumn: null,  // currently selected header for the Trend chart
   };
@@ -155,9 +156,11 @@
   const closeFullView = el('closeFullView');
   const paretoCard = el('paretoCard');
   const paretoColumnSelect = el('paretoColumnSelect');
+  const paretoGroupSelect = el('paretoGroupSelect');
   const paretoSvg = el('paretoSvg');
   const paretoEmptyState = el('paretoEmptyState');
   const paretoList = el('paretoList');
+  const paretoLegend = el('paretoLegend');
   const paretoStage = el('paretoStage');
   const paretoFullViewBtn = el('paretoFullViewBtn');
   const trendCard = el('trendCard');
@@ -507,6 +510,7 @@
     }
     state.selectedDefects = new Set();
     populateParetoColumnSelect();
+    populateParetoGroupSelect();
     populateTrendColumnSelect();
     render();
     if (busiestKey) {
@@ -537,6 +541,29 @@
     paretoColumnSelect.value = state.paretoColumn;
   }
 
+  // Rebuilds the "Group by" dropdown the same way, but defaults to off
+  // ('' = no grouping) rather than auto-picking a column -- unlike the main
+  // Pareto column, stacking is an opt-in refinement, not something that
+  // should suddenly appear (and repaint every bar) just because a new file
+  // happened to load.
+  function populateParetoGroupSelect() {
+    const prev = state.paretoGroupColumn;
+    paretoGroupSelect.innerHTML = '';
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = '(None)';
+    paretoGroupSelect.appendChild(noneOpt);
+    for (const col of state.paretoColumns) {
+      const opt = document.createElement('option');
+      opt.value = col;
+      opt.textContent = col;
+      paretoGroupSelect.appendChild(opt);
+    }
+    paretoGroupSelect.disabled = false;
+    state.paretoGroupColumn = prev === '' || state.paretoColumns.includes(prev) ? prev : '';
+    paretoGroupSelect.value = state.paretoGroupColumn;
+  }
+
   // Reads a record's value for any loaded column, whether it's one of the
   // fixed fields (die_X, die_Y, GDS-X, GDS-Y, ECID) or a free-form "extra"
   // column -- the Pareto chart lets the user pick any of them.
@@ -552,6 +579,11 @@
 
   paretoColumnSelect.addEventListener('change', () => {
     state.paretoColumn = paretoColumnSelect.value;
+    renderPareto();
+  });
+
+  paretoGroupSelect.addEventListener('change', () => {
+    state.paretoGroupColumn = paretoGroupSelect.value;
     renderPareto();
   });
 
@@ -1361,6 +1393,34 @@
   const PARETO_VIEWBOX_W = 640;
   const PARETO_VIEWBOX_H = 380;
   const PARETO_MARGIN = { top: 20, right: 54, bottom: 100, left: 50 };
+  // A validated 8-color categorical palette (css/style.css --series-1..8) is
+  // the hard cap on distinct colored segments in a stacked bar -- past that,
+  // a 9th color is never manufactured, it folds into a shared "Other"
+  // segment (dataviz skill: "color follows the entity, never its rank").
+  const PARETO_GROUP_MAX_SERIES = 8;
+
+  // Ranks the "Group by" column's values by their OVERALL frequency across
+  // every loaded record (not per-bar), and assigns the top
+  // PARETO_GROUP_MAX_SERIES a fixed color-slot index. Computed once and
+  // reused for every bar's segments so a given group value always gets the
+  // same color everywhere on the chart -- color identity must not depend on
+  // which bar happens to be showing it.
+  function computeGroupColorRanks() {
+    const ranks = new Map(); // groupLabel -> 0-based rank
+    if (!state.paretoGroupColumn) return ranks;
+    const totals = new Map();
+    for (const rec of state.records) {
+      const raw = getColumnValue(rec, state.paretoGroupColumn);
+      const label = (raw === null || raw === undefined || String(raw).trim() === '') ? '(blank)' : String(raw);
+      totals.set(label, (totals.get(label) || 0) + 1);
+    }
+    [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, PARETO_GROUP_MAX_SERIES)
+      .forEach(([label], i) => ranks.set(label, i));
+    return ranks;
+  }
+  function seriesColorVar(rank) { return `var(--series-${rank + 1})`; }
 
   // Counts how often each value of the selected column occurs, sorted most-
   // to-least common, with a running cumulative percentage -- the two things
@@ -1369,27 +1429,83 @@
   // "just what's currently selected" would make it answer a different
   // question (this selection's makeup) than a Pareto chart is for (what
   // dominates across the whole dataset).
+  //
+  // When a "Group by" column is set, each entry also gets a `segments` array
+  // (label/count/color, ordered by the fixed global color rank, "Other"
+  // last) so the bar can be drawn stacked instead of solid. The returned
+  // `legend` lists every color actually used, in the same fixed order.
   function computeParetoData() {
+    const hasGroup = !!state.paretoGroupColumn;
+    const groupRanks = hasGroup ? computeGroupColorRanks() : null;
     const counts = new Map();
+    const groupBreakdown = new Map(); // mainLabel -> Map(groupLabel -> count)
     for (const rec of state.records) {
       const raw = getColumnValue(rec, state.paretoColumn);
       const label = (raw === null || raw === undefined || String(raw).trim() === '') ? '(blank)' : String(raw);
       counts.set(label, (counts.get(label) || 0) + 1);
+      if (hasGroup) {
+        const graw = getColumnValue(rec, state.paretoGroupColumn);
+        const glabel = (graw === null || graw === undefined || String(graw).trim() === '') ? '(blank)' : String(graw);
+        if (!groupBreakdown.has(label)) groupBreakdown.set(label, new Map());
+        const gm = groupBreakdown.get(label);
+        gm.set(glabel, (gm.get(glabel) || 0) + 1);
+      }
     }
     let entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
     if (entries.length > PARETO_MAX_CATEGORIES) {
       const top = entries.slice(0, PARETO_MAX_CATEGORIES - 1);
       const rest = entries.slice(PARETO_MAX_CATEGORIES - 1);
       const othersCount = rest.reduce((sum, [, c]) => sum + c, 0);
-      top.push([`Others (${rest.length} values)`, othersCount]);
+      const othersLabel = `Others (${rest.length} values)`;
+      top.push([othersLabel, othersCount]);
+      if (hasGroup) {
+        // The collapsed categories' own group breakdowns merge into one, so
+        // the "Others" bar can still be split by group like any other bar.
+        const merged = new Map();
+        for (const [mainLabel] of rest) {
+          const gm = groupBreakdown.get(mainLabel);
+          if (!gm) continue;
+          for (const [g, c] of gm) merged.set(g, (merged.get(g) || 0) + c);
+        }
+        groupBreakdown.set(othersLabel, merged);
+      }
       entries = top;
     }
     const total = state.records.length;
     let running = 0;
-    return entries.map(([label, count]) => {
+    const legendUsed = new Map(); // label -> color, insertion order
+    let othersUsedInLegend = false;
+    const data = entries.map(([label, count]) => {
       running += count;
-      return { label, count, pct: (count / total) * 100, cumPct: (running / total) * 100 };
+      const result = { label, count, pct: (count / total) * 100, cumPct: (running / total) * 100 };
+      if (hasGroup) {
+        const gm = groupBreakdown.get(label) || new Map();
+        const named = [];
+        let otherCount = 0;
+        for (const [g, c] of gm) {
+          if (groupRanks.has(g)) named.push([g, c, groupRanks.get(g)]);
+          else otherCount += c;
+        }
+        named.sort((a, b) => a[2] - b[2]);
+        const segments = named.map(([g, c, rank]) => ({ label: g, count: c, color: seriesColorVar(rank) }));
+        if (otherCount > 0) { segments.push({ label: 'Other', count: otherCount, color: 'var(--text-muted)' }); othersUsedInLegend = true; }
+        for (const seg of segments) if (!legendUsed.has(seg.label)) legendUsed.set(seg.label, seg.color);
+        result.segments = segments;
+      }
+      return result;
     });
+    // Legend order follows the fixed color rank (not first-appearance), plus
+    // "Other" last if it was ever used -- matches the stacking order within
+    // each bar so the legend reads as a key to what's on screen.
+    let legend = [];
+    if (hasGroup) {
+      legend = [...groupRanks.entries()]
+        .sort((a, b) => a[1] - b[1])
+        .filter(([label]) => legendUsed.has(label))
+        .map(([label, rank]) => ({ label, color: seriesColorVar(rank) }));
+      if (othersUsedInLegend) legend.push({ label: 'Other', color: 'var(--text-muted)' });
+    }
+    return { data, legend };
   }
 
   function renderPareto() {
@@ -1397,11 +1513,13 @@
     if (!state.records.length || !state.paretoColumn) {
       paretoEmptyState.hidden = false;
       paretoList.innerHTML = '';
+      paretoLegend.hidden = true;
+      paretoLegend.innerHTML = '';
       return;
     }
     paretoEmptyState.hidden = true;
 
-    const data = computeParetoData();
+    const { data, legend } = computeParetoData();
     const x0 = PARETO_MARGIN.left;
     const x1 = PARETO_VIEWBOX_W - PARETO_MARGIN.right;
     const y0 = PARETO_MARGIN.top;
@@ -1461,23 +1579,58 @@
 
     const linePoints = [];
 
+    // 2px-ish gap between stacked segments (and it doubles as breathing room
+    // above/below a solid bar) -- separates touching marks with surface-
+    // color air instead of a border, per the dataviz skill's stacked-bar
+    // mark spec.
+    const SEGMENT_GAP = 1.5;
+
     data.forEach((entry, i) => {
       const cx = x0 + bandW * (i + 0.5);
-      const barH = (entry.count / yMax) * plotH;
-      const by = y1 - barH;
-      // "Vital few" bars (up through the 80% cumulative cutoff) are drawn in
-      // the accent color; the "trivial many" tail is dimmed, same visual
-      // language as the die defect map's selected-vs-dimmed dots.
+      // "Vital few" bars (up through the 80% cumulative cutoff) are drawn at
+      // full opacity; the "trivial many" tail is dimmed, same visual
+      // language as the die defect map's selected-vs-dimmed dots. This
+      // opacity layer applies whether or not the bar is also split into
+      // group-colored segments -- it says "how much this bar matters
+      // overall," which is orthogonal to what a grouped bar's colors say
+      // ("what this bar is made of").
       const vital = i <= cutoffIndex;
-      const bar = svgEl('rect', {
-        class: 'pareto-bar', x: cx - barW / 2, y: by, width: barW, height: Math.max(barH, 0.5),
-        fill: vital ? 'var(--accent-2)' : 'var(--text-muted)', opacity: vital ? 0.9 : 0.45,
-      });
-      const tip = `${entry.label}\nCount: ${entry.count} (${entry.pct.toFixed(1)}%)\nCumulative: ${entry.cumPct.toFixed(1)}%`;
-      bar.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tip));
-      bar.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tip));
-      bar.addEventListener('mouseleave', hideTooltip);
-      frag.appendChild(bar);
+      const opacity = vital ? 0.9 : 0.45;
+      const wholeBarTip = `${entry.label}\nCount: ${entry.count} (${entry.pct.toFixed(1)}%)\nCumulative: ${entry.cumPct.toFixed(1)}%`;
+
+      if (entry.segments) {
+        let cumCount = 0;
+        for (const seg of entry.segments) {
+          const segTopCount = cumCount + seg.count;
+          const segTopY = y1 - (segTopCount / yMax) * plotH;
+          const segBottomY = y1 - (cumCount / yMax) * plotH;
+          const rawH = segBottomY - segTopY;
+          const insetH = Math.max(rawH - SEGMENT_GAP, 0.5);
+          const segY = segTopY + (rawH - insetH) / 2;
+          const rect = svgEl('rect', {
+            class: 'pareto-bar', x: cx - barW / 2, y: segY, width: barW, height: insetH,
+            fill: seg.color, opacity,
+          });
+          const segPct = entry.count > 0 ? (seg.count / entry.count) * 100 : 0;
+          const segTip = `${entry.label} — ${seg.label}\nCount: ${seg.count} (${segPct.toFixed(1)}% of this bar)\nBar total: ${entry.count}`;
+          rect.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, segTip));
+          rect.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, segTip));
+          rect.addEventListener('mouseleave', hideTooltip);
+          frag.appendChild(rect);
+          cumCount = segTopCount;
+        }
+      } else {
+        const barH = (entry.count / yMax) * plotH;
+        const by = y1 - barH;
+        const bar = svgEl('rect', {
+          class: 'pareto-bar', x: cx - barW / 2, y: by, width: barW, height: Math.max(barH, 0.5),
+          fill: vital ? 'var(--accent-2)' : 'var(--text-muted)', opacity,
+        });
+        bar.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, wholeBarTip));
+        bar.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, wholeBarTip));
+        bar.addEventListener('mouseleave', hideTooltip);
+        frag.appendChild(bar);
+      }
 
       const labelText = entry.label.length > 16 ? `${entry.label.slice(0, 14)}…` : entry.label;
       const xLabel = svgEl('text', {
@@ -1485,12 +1638,12 @@
         transform: `rotate(-40 ${cx} ${y1 + 14})`,
       });
       xLabel.textContent = labelText;
-      xLabel.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tip));
-      xLabel.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tip));
+      xLabel.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, wholeBarTip));
+      xLabel.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, wholeBarTip));
       xLabel.addEventListener('mouseleave', hideTooltip);
       frag.appendChild(xLabel);
 
-      linePoints.push([cx, y1 - (entry.cumPct / 100) * plotH, tip]);
+      linePoints.push([cx, y1 - (entry.cumPct / 100) * plotH, wholeBarTip]);
     });
 
     // Cumulative-% line, drawn over the bars.
@@ -1510,14 +1663,36 @@
 
     paretoSvg.appendChild(frag);
 
+    // Legend: the dependable identity channel for >=2 series, per the
+    // dataviz skill -- readers shouldn't have to color-match segments to
+    // values unaided. A single (or zero) series needs no legend box.
+    paretoLegend.innerHTML = '';
+    if (legend.length >= 2) {
+      for (const item of legend) {
+        const el = document.createElement('span');
+        el.className = 'pareto-legend-item';
+        el.innerHTML = `<span class="pareto-legend-swatch" style="background:${item.color}"></span>${escapeHtml(item.label)}`;
+        paretoLegend.appendChild(el);
+      }
+      paretoLegend.hidden = false;
+    } else {
+      paretoLegend.hidden = true;
+    }
+
     paretoList.innerHTML = '';
     data.forEach((entry, i) => {
       const row = document.createElement('div');
       row.className = 'pareto-row' + (i <= cutoffIndex ? ' vital' : '');
-      row.innerHTML = `
+      let html = `
         <div class="pareto-row-head"><span>#${i + 1} ${escapeHtml(entry.label)}</span><span>${entry.count}</span></div>
         <div class="pareto-row-sub"><span>${entry.pct.toFixed(1)}% of total</span><span>Cum ${entry.cumPct.toFixed(1)}%</span></div>
       `;
+      if (entry.segments && entry.segments.length) {
+        html += '<div class="pareto-row-groups">' + entry.segments.map((seg) =>
+          `<span class="pareto-row-group"><span class="pareto-legend-swatch" style="background:${seg.color}"></span>${escapeHtml(seg.label)}: ${seg.count}</span>`
+        ).join('') + '</div>';
+      }
+      row.innerHTML = html;
       paretoList.appendChild(row);
     });
   }
