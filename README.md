@@ -11,7 +11,8 @@ Everything runs in the browser — the file never leaves your machine.
 
 ## Features
 
-- Set wafer size (8" / 12"), die size (X/Y mm), and notch direction
+- Set wafer size (8" / 12"), die size (X/Y mm), scribe lane width (µm),
+  edge exclusion (mm), and notch direction
 - Upload (or drag & drop) a defect file as **CSV, TSV, or Excel (.xlsx/.xls)**
   — comma, tab, semicolon or pipe delimited text files are auto-detected
 - Multi-sheet XLSX workbooks show a **Sheet** picker; the first sheet loads
@@ -20,9 +21,12 @@ Everything runs in the browser — the file never leaves your machine.
   plus a manual encoding selector (Big5, GBK/GB18030, Shift-JIS,
   Windows-1252) for files saved in other locale encodings
 - **Wafer map**: every die that geometrically fits the wafer, computed from
-  wafer + die size, with dies containing defects color-coded by defect
-  count; hover a die to see its (die_X, die_Y) coordinate, defect count, and
-  ECID(s) if an ECID/CQC-number column is present
+  wafer size, die size, and scribe lane width (die pitch = die size +
+  scribe lane), with dies containing defects color-coded by defect count.
+  Dies inside the edge exclusion ring are dimmed/dashed and excluded from
+  the "usable dies" count, with the ring itself drawn as a dashed circle.
+  Hover a die to see its (die_X, die_Y) coordinate, defect count, ECID(s)
+  if present, and edge-exclusion status
 - **Die defect map**: always-visible second view plotting each defect of the
   selected die at its exact (GDS-X, GDS-Y) offset from the die center, with
   a ruler (tick marks + µm labels) on both axes, and a hover tooltip and
@@ -89,16 +93,27 @@ convention below).
 
 - **Wafer diameter**: 8" → 200 mm, 12" → 300 mm (standard nominal fab sizes,
   not a literal inch-to-mm conversion).
+- **Die pitch = die size + scribe lane**: the physical center-to-center
+  spacing between adjacent dies is `dieSize + scribeLaneWidth` (scribe lane
+  converted from µm to mm), not the bare die size — dies are drawn at their
+  actual size with the scribe lane as the gap between them.
 - **Die grid origin (first quadrant)**: `die_X`/`die_Y` are non-negative,
   0-based indices into the theoretical grid's bounding square — die
   `(0, 0)` is the grid's corner, not the wafer center. The wafer center
   falls at index `(centerX, centerY)`, where `centerX`/`centerY` are
   auto-computed as half the total die columns/rows spanning the wafer
-  diameter (`ceil(waferRadius / dieSizeX) + 1`, and likewise for Y). A
-  die's physical center relative to the wafer center is therefore
-  `((die_X - centerX) * dieSizeX, (die_Y - centerY) * dieSizeY)` mm. A die
-  is drawn if any part of its footprint overlaps the wafer circle (so
-  partial edge dies are included, matching typical wafer map tools).
+  diameter (`ceil(waferRadius / pitchX) + 1`, and likewise for Y). A die's
+  physical center relative to the wafer center is therefore
+  `((die_X - centerX) * pitchX, (die_Y - centerY) * pitchY)` mm. A die is
+  drawn if any part of its footprint overlaps the wafer circle (so partial
+  edge dies are included, matching typical wafer map tools).
+- **Edge exclusion**: a die counts as usable only if its farthest corner
+  from the wafer center stays within `waferRadius - edgeExclusion` — i.e.
+  the whole die must clear the exclusion ring, not just its center. Dies
+  that don't clear it are still drawn (for visual completeness) but shown
+  dimmed with a dashed outline, and are excluded from the "usable dies"
+  stat. The exclusion boundary itself is drawn as a dashed circle inside
+  the wafer edge.
 - **Notch direction**: rotates the entire wafer map (circle + die grid +
   notch mark) in 90° steps — Down = 0°, Right = 90°, Up = 180°, Left = 270°
   (clockwise) — as a visual/orientation reference. It does not remap which

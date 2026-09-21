@@ -23,6 +23,8 @@
     waferInch: 12,
     dieSizeX: 5,
     dieSizeY: 5,
+    scribeLaneUm: 80,
+    edgeExclusionMm: 3,
     notch: 'down',
     records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
     defectsByDie: new Map(),// key "x,y" -> records[]
@@ -36,6 +38,8 @@
   const waferSizeSel = el('waferSize');
   const dieSizeXInput = el('dieSizeX');
   const dieSizeYInput = el('dieSizeY');
+  const scribeLaneInput = el('scribeLane');
+  const edgeExclusionInput = el('edgeExclusion');
   const notchSel = el('notchDir');
   const csvInput = el('csvInput');
   const dropzone = el('dropzone');
@@ -49,6 +53,8 @@
   const csvError = el('csvError');
   const statsPanel = el('statsPanel');
   const statTotalDies = el('statTotalDies');
+  const statUsableDies = el('statUsableDies');
+  const statExcludedDies = el('statExcludedDies');
   const statDefectDies = el('statDefectDies');
   const statTotalDefects = el('statTotalDefects');
   const legend = el('legend');
@@ -353,9 +359,11 @@
     state.waferInch = Number(waferSizeSel.value);
     state.dieSizeX = Math.max(0.1, Number(dieSizeXInput.value) || 5);
     state.dieSizeY = Math.max(0.1, Number(dieSizeYInput.value) || 5);
+    state.scribeLaneUm = Math.max(0, Number(scribeLaneInput.value) || 0);
+    state.edgeExclusionMm = Math.max(0, Number(edgeExclusionInput.value) || 0);
     state.notch = notchSel.value;
   }
-  [waferSizeSel, dieSizeXInput, dieSizeYInput, notchSel].forEach((input) => {
+  [waferSizeSel, dieSizeXInput, dieSizeYInput, scribeLaneInput, edgeExclusionInput, notchSel].forEach((input) => {
     input.addEventListener('change', () => { readInputs(); render(); });
   });
 
@@ -363,9 +371,15 @@
   function computeDieGrid() {
     const diameterMm = WAFER_DIAMETER_MM[state.waferInch];
     const radiusMm = diameterMm / 2;
-    const { dieSizeX, dieSizeY } = state;
-    const maxI = Math.ceil(radiusMm / dieSizeX) + 1;
-    const maxJ = Math.ceil(radiusMm / dieSizeY) + 1;
+    const { dieSizeX, dieSizeY, scribeLaneUm, edgeExclusionMm } = state;
+    // Die pitch (center-to-center spacing) includes the scribe lane (saw street)
+    // between dies -- dies are drawn at their actual size, but spaced by pitch.
+    const scribeLaneMm = scribeLaneUm / 1000;
+    const pitchX = dieSizeX + scribeLaneMm;
+    const pitchY = dieSizeY + scribeLaneMm;
+    const usableRadiusMm = Math.max(radiusMm - edgeExclusionMm, 0);
+    const maxI = Math.ceil(radiusMm / pitchX) + 1;
+    const maxJ = Math.ceil(radiusMm / pitchY) + 1;
     const dies = [];
 
     // die_X/die_Y in the CSV are non-negative (first-quadrant indexing), with the
@@ -373,20 +387,25 @@
     // the theoretical grid's bounding square, not the wafer center itself.
     for (let i = -maxI; i <= maxI; i++) {
       for (let j = -maxJ; j <= maxJ; j++) {
-        const cx = i * dieSizeX;
-        const cy = j * dieSizeY;
+        const cx = i * pitchX;
+        const cy = j * pitchY;
         const halfX = dieSizeX / 2;
         const halfY = dieSizeY / 2;
-        // closest point on die rect to wafer center (0,0)
+        // closest point on die rect to wafer center (0,0) -- decides whether the
+        // die physically fits on the wafer at all.
         const closestX = Math.max(cx - halfX, Math.min(0, cx + halfX));
         const closestY = Math.max(cy - halfY, Math.min(0, cy + halfY));
         const dist = Math.hypot(closestX, closestY);
         if (dist <= radiusMm) {
-          dies.push({ i: i + maxI, j: j + maxJ, cx, cy });
+          // farthest point on die rect from wafer center -- a die only counts as
+          // usable if it sits entirely clear of the edge exclusion ring.
+          const farthestDist = Math.hypot(Math.abs(cx) + halfX, Math.abs(cy) + halfY);
+          const usable = farthestDist <= usableRadiusMm;
+          dies.push({ i: i + maxI, j: j + maxJ, cx, cy, usable });
         }
       }
     }
-    return { dies, radiusMm, diameterMm };
+    return { dies, radiusMm, diameterMm, usableRadiusMm };
   }
 
   function defectBucketColor(count) {
@@ -409,11 +428,12 @@
     return seen.length > MAX_SHOWN ? `${shown}, +${seen.length - MAX_SHOWN} more` : shown;
   }
 
-  function dieHoverText(x, y, defects) {
+  function dieHoverText(x, y, defects, usable) {
     const count = defects ? defects.length : 0;
     const lines = [`Die (${x}, ${y})`, `Defects: ${count}`];
     const ecidList = formatEcidList(defects);
     if (ecidList) lines.push(`ECID: ${ecidList}`);
+    if (usable === false) lines.push('Edge exclusion (unusable)');
     return lines.join('\n');
   }
 
@@ -431,6 +451,10 @@
       wrap.innerHTML = `<span class="legend-swatch" style="background:${item.color}"></span>${item.label}`;
       legend.appendChild(wrap);
     }
+    const excludedWrap = document.createElement('span');
+    excludedWrap.className = 'legend-item';
+    excludedWrap.innerHTML = '<span class="legend-swatch excluded-swatch"></span>Edge exclusion';
+    legend.appendChild(excludedWrap);
   }
 
   function svgEl(tag, attrs) {
@@ -443,9 +467,9 @@
     readInputs();
     waferSvg.innerHTML = '';
 
-    const { dies, radiusMm, diameterMm } = computeDieGrid();
-    const usableRadiusPx = (WAFER_VIEWBOX / 2) - WAFER_MARGIN;
-    const mmToPx = usableRadiusPx / radiusMm;
+    const { dies, radiusMm, diameterMm, usableRadiusMm } = computeDieGrid();
+    const waferRadiusPx = (WAFER_VIEWBOX / 2) - WAFER_MARGIN;
+    const mmToPx = waferRadiusPx / radiusMm;
     const centerPx = WAFER_VIEWBOX / 2;
 
     const group = svgEl('g', {
@@ -454,12 +478,19 @@
 
     // wafer circle
     group.appendChild(svgEl('circle', {
-      class: 'wafer-circle', cx: centerPx, cy: centerPx, r: usableRadiusPx,
+      class: 'wafer-circle', cx: centerPx, cy: centerPx, r: waferRadiusPx,
     }));
+
+    // edge exclusion boundary (dashed ring) -- dies outside this ring are unusable
+    if (state.edgeExclusionMm > 0 && usableRadiusMm > 0) {
+      group.appendChild(svgEl('circle', {
+        class: 'exclusion-ring', cx: centerPx, cy: centerPx, r: usableRadiusMm * mmToPx,
+      }));
+    }
 
     // notch mark (bottom, before rotation)
     const notchSize = 10;
-    const ny = centerPx + usableRadiusPx;
+    const ny = centerPx + waferRadiusPx;
     group.appendChild(svgEl('path', {
       class: 'notch-mark',
       d: `M ${centerPx - notchSize} ${ny} L ${centerPx} ${ny - notchSize} L ${centerPx + notchSize} ${ny} Z`,
@@ -467,12 +498,14 @@
 
     let defectDieCount = 0;
     let totalDefects = 0;
+    let usableDieCount = 0;
 
     for (const die of dies) {
       const key = `${die.i},${die.j}`;
       const defects = state.defectsByDie.get(key);
       const count = defects ? defects.length : 0;
       if (count > 0) { defectDieCount++; totalDefects += count; }
+      if (die.usable) usableDieCount++;
 
       const w = state.dieSizeX * mmToPx;
       const h = state.dieSizeY * mmToPx;
@@ -480,12 +513,13 @@
       const y = centerPx - die.cy * mmToPx - h / 2;
 
       const fill = defectBucketColor(count) || 'var(--die-empty-fill)';
+      const rectClass = die.usable ? 'die-rect' : 'die-rect excluded';
       const rect = svgEl('rect', {
-        class: 'die-rect', x, y, width: Math.max(w - 0.6, 0.5), height: Math.max(h - 0.6, 0.5),
+        class: rectClass, x, y, width: Math.max(w - 0.6, 0.5), height: Math.max(h - 0.6, 0.5),
         fill, stroke: 'var(--die-empty-stroke)',
         'data-die-x': die.i, 'data-die-y': die.j, 'data-count': count,
       });
-      const dieTip = dieHoverText(die.i, die.j, defects);
+      const dieTip = dieHoverText(die.i, die.j, defects, die.usable);
       rect.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, dieTip));
       rect.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, dieTip));
       rect.addEventListener('mouseleave', hideTooltip);
@@ -498,6 +532,8 @@
 
     statsPanel.hidden = state.records.length === 0;
     statTotalDies.textContent = dies.length.toLocaleString();
+    statUsableDies.textContent = usableDieCount.toLocaleString();
+    statExcludedDies.textContent = (dies.length - usableDieCount).toLocaleString();
     statDefectDies.textContent = defectDieCount.toLocaleString();
     statTotalDefects.textContent = totalDefects.toLocaleString();
     renderLegend();

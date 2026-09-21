@@ -57,6 +57,17 @@
           </label>
         </div>
 
+        <div class="field-row">
+          <label class="field">
+            <span>Scribe Lane Width (µm)</span>
+            <input type="number" id="scribeLane" min="0" step="1" value="80" />
+          </label>
+          <label class="field">
+            <span>Edge Exclusion (mm)</span>
+            <input type="number" id="edgeExclusion" min="0" step="0.5" value="3" />
+          </label>
+        </div>
+
         <label class="field">
           <span>Notch Direction</span>
           <select id="notchDir">
@@ -103,6 +114,8 @@
         <h2 class="panel-title">Summary</h2>
         <dl class="stats">
           <div><dt>Dies on wafer</dt><dd id="statTotalDies">–</dd></div>
+          <div><dt>Usable dies</dt><dd id="statUsableDies">–</dd></div>
+          <div><dt>Edge-excluded dies</dt><dd id="statExcludedDies">–</dd></div>
           <div><dt>Dies w/ defects</dt><dd id="statDefectDies">–</dd></div>
           <div><dt>Total defects</dt><dd id="statTotalDefects">–</dd></div>
         </dl>

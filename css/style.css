@@ -142,6 +142,7 @@ code { font-family: var(--font-mono); }
 .legend { display: flex; gap: 8px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); }
 .legend-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.excluded-swatch { background: var(--die-empty-fill); border: 1.5px dashed var(--text-muted); opacity: 0.7; }
 
 /* ===================== Content ===================== */
 .content { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
@@ -163,6 +164,7 @@ code { font-family: var(--font-mono); }
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px; margin: 0;
 }
+.empty-state[hidden] { display: none; }
 
 .die-stage { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
 .die-svg-wrap { position: relative; }
@@ -179,7 +181,9 @@ code { font-family: var(--font-mono); }
 .die-rect { stroke-width: 1; cursor: pointer; transition: filter 0.15s ease, stroke-width 0.15s ease; }
 .die-rect:hover { filter: brightness(1.35); stroke-width: 2; stroke: var(--accent); }
 .die-rect.selected { stroke: var(--accent-2); stroke-width: 2.5; }
+.die-rect.excluded { opacity: 0.4; stroke-dasharray: 1.5 1.5; }
 .wafer-circle { fill: none; stroke: var(--border); stroke-width: 2; }
+.exclusion-ring { fill: none; stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 5 4; opacity: 0.7; }
 .notch-mark { fill: var(--bg); stroke: var(--border); stroke-width: 1.5; }
 .defect-dot { fill: var(--accent-2); stroke: var(--bg); stroke-width: 1; cursor: pointer; }
 .defect-dot:hover { filter: brightness(1.4); r: 7; }
