@@ -164,6 +164,16 @@
       <section class="stage-card" id="dieCard">
         <div class="stage-header">
           <h2>Die Defect Map — <span id="dieCardTitle">–</span></h2>
+          <button type="button" class="icon-btn small-icon-btn" id="fullViewBtn" title="Full view" aria-label="Open die defect map in full view">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm16 0h-2v4h-4v2h6v-6Z"/></svg>
+          </button>
+          <button class="text-btn" id="closeDieCard">Clear selection</button>
+        </div>
+        <p class="muted small stage-hint">Click a dot to highlight its die, click empty space to clear · Ctrl/Shift-click (or -drag a box) to select multiple</p>
+        <!-- Reparented together with .die-stage into the full-view modal, so
+             these controls stay reachable there instead of being stranded
+             behind the modal overlay in the original card. -->
+        <div class="die-toolbar" id="dieToolbar">
           <div class="gds-calibration">
             <span class="muted small">GDS Origin Offset (µm)</span>
             <input type="number" id="gdsOffsetX" step="1" value="0" class="calib-input" aria-label="GDS origin offset X (µm)" title="GDS Offset X (µm)" />
@@ -185,12 +195,10 @@
             <span class="muted small">Grid Color</span>
             <input type="color" id="gridLineColor" value="#ff3b3b" class="calib-color" aria-label="Grid line color" title="Grid line color" />
           </label>
-          <button type="button" class="icon-btn small-icon-btn" id="fullViewBtn" title="Full view" aria-label="Open die defect map in full view">
-            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm16 0h-2v4h-4v2h6v-6Z"/></svg>
+          <button type="button" class="icon-btn small-icon-btn" id="toggleCoordNumbersBtn" title="Show/hide coordinate numbers" aria-label="Show/hide coordinate numbers" aria-pressed="true">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M3 5h2v2H3V5Zm4 0h14v2H7V5ZM3 11h2v2H3v-2Zm4 0h14v2H7v-2ZM3 17h2v2H3v-2Zm4 0h14v2H7v-2Z"/></svg>
           </button>
-          <button class="text-btn" id="closeDieCard">Clear selection</button>
         </div>
-        <p class="muted small stage-hint">Click a dot to highlight its die, click empty space to clear · Ctrl/Shift-click (or -drag a box) to select multiple</p>
         <div class="die-stage" id="dieStage">
           <div class="die-svg-wrap" id="dieSvgWrap">
             <svg id="dieSvg" viewBox="0 0 480 480" role="img" aria-label="Die defect map"></svg>
@@ -228,7 +236,7 @@
         <ol class="small guide-list">
           <li>Upload a defect file (CSV, TSV, or XLSX) at the top of the sidebar.</li>
           <li>Set <strong>Wafer Size</strong>, <strong>Die Size</strong>, and <strong>Notch Direction</strong> to match your data — before or after uploading, both work.</li>
-          <li>Hover a die on the wafer map for its coordinate; click a die (or a dot on the die defect map) to highlight it. Ctrl/Cmd/Shift-click, or -drag a box, on either map to select multiple dies at once; click empty space to clear the selection.</li>
+          <li>Hover a die on the wafer map for its coordinate. Clicking a wafer die highlights its <em>entire</em> set of defects; clicking a dot on the die defect map highlights just that <em>one</em> defect. Ctrl/Cmd/Shift-click, or -drag a box, on either map to add more to the selection; click empty space to clear it.</li>
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
         </ol>

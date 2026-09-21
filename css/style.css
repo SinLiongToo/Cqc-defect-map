@@ -128,6 +128,7 @@ body {
 .field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .label-with-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .small-icon-btn { width: 22px; height: 22px; border-radius: 6px; padding: 0; }
+.small-icon-btn[aria-pressed="false"] { color: var(--text-muted); border-color: var(--border-soft); opacity: 0.55; }
 select, input[type="number"] {
   background: var(--bg-inset); color: var(--text); border: 1px solid var(--border);
   border-radius: 8px; padding: 9px 10px; font-family: var(--font-mono); font-size: 13px;
@@ -192,6 +193,7 @@ code { font-family: var(--font-mono); }
 .text-btn:hover { color: var(--danger); border-color: var(--danger); }
 
 .gds-calibration { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.die-toolbar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
 .calib-input {
   width: 70px; background: var(--bg-inset); color: var(--text); border: 1px solid var(--border);
   border-radius: 8px; padding: 6px 8px; font-family: var(--font-mono); font-size: 12px; outline: none;
@@ -244,6 +246,7 @@ code { font-family: var(--font-mono); }
 .tick-mark { stroke: var(--border-soft); stroke-width: 1; }
 .grid-line { stroke: var(--border-soft); stroke-width: 0.75; opacity: 0.5; }
 .tick-label { font-size: 9px; }
+#dieSvg.hide-coord-numbers .tick-label { display: none; }
 
 /* ===================== Tooltip ===================== */
 .tooltip {

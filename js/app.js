@@ -38,15 +38,34 @@
     gdsCalibratedCenterYUm: null,
     dieRotationDeg: 0,
     gridLineColor: '#ff3b3b', // defaults to red; user can repick via the Grid Color input
+    showCoordNumbers: true,   // toggles the die defect map's ruler tick-value labels
     notch: 'down',
-    records: [],            // [{dieX, dieY, gdsX, gdsY, raw:{...}}]
-    defectsByDie: new Map(),// key "x,y" -> records[]
-    selectedDies: new Set(),// Set of "x,y" keys -- supports multi-select (ctrl/shift-click)
+    records: [],             // [{recId, dieX, dieY, gdsX, gdsY, raw:{...}}]
+    recordsById: new Map(),  // recId -> record, for O(1) lookup
+    defectsByDie: new Map(), // key "x,y" -> records[]
+    // Selection is tracked per individual defect (recId), not per die, so the
+    // die defect map's composite plot can highlight exactly the dots picked
+    // (e.g. via drag-select) without lighting up a die's other, unrelated
+    // defects elsewhere on the plot. Clicking a die on the wafer map (which
+    // has no way to target one specific defect) still selects that whole
+    // die's defects as a block, by adding all of their recIds at once.
+    selectedDefects: new Set(), // Set of recId numbers
     rawBytes: null,         // Uint8Array of the last-loaded text file, kept for re-decoding on encoding change
     workbook: null,         // SheetJS workbook, kept for re-parsing on sheet change (xlsx/xls only)
   };
 
   function dieKey(x, y) { return `${x},${y}`; }
+
+  // Distinct dies represented among the currently selected defects. The
+  // wafer map only has die-level granularity, so this is what it outlines.
+  function getSelectedDieKeys() {
+    const keys = new Set();
+    for (const recId of state.selectedDefects) {
+      const rec = state.recordsById.get(recId);
+      if (rec) keys.add(dieKey(rec.dieX, rec.dieY));
+    }
+    return keys;
+  }
 
   /* ===================== DOM refs ===================== */
   const el = (id) => document.getElementById(id);
@@ -110,6 +129,8 @@
   const helpModal = el('helpModal');
   const closeHelpModal = el('closeHelpModal');
   const dieStage = el('dieStage');
+  const dieToolbar = el('dieToolbar');
+  const toggleCoordNumbersBtn = el('toggleCoordNumbersBtn');
   const fullViewBtn = el('fullViewBtn');
   const fullViewModal = el('fullViewModal');
   const fullViewBody = el('fullViewBody');
@@ -124,10 +145,12 @@
   helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeModal(helpModal); });
 
   fullViewBtn.addEventListener('click', () => {
+    fullViewBody.appendChild(dieToolbar);
     fullViewBody.appendChild(dieStage);
     openModal(fullViewModal);
   });
   function exitFullView() {
+    dieCard.appendChild(dieToolbar);
     dieCard.appendChild(dieStage);
     closeModal(fullViewModal);
   }
@@ -389,6 +412,7 @@
       // wafer map's per-die defect count -- it just can't be plotted as a dot
       // in the die defect map (gdsXUm/gdsYUm are null when missing).
       records.push({
+        recId: records.length,
         dieX, dieY,
         gdsXUm: hasGds ? gdsXUmRaw : null,
         gdsYUm: hasGds ? gdsYUmRaw : null,
@@ -418,8 +442,10 @@
     }
 
     state.records = records;
+    state.recordsById = new Map();
     state.defectsByDie = new Map();
     for (const rec of records) {
+      state.recordsById.set(rec.recId, rec);
       const key = `${rec.dieX},${rec.dieY}`;
       if (!state.defectsByDie.has(key)) state.defectsByDie.set(key, []);
       state.defectsByDie.get(key).push(rec);
@@ -430,7 +456,7 @@
     for (const [key, defects] of state.defectsByDie) {
       if (defects.length > busiestCount) { busiestCount = defects.length; busiestKey = key; }
     }
-    state.selectedDies = new Set();
+    state.selectedDefects = new Set();
     render();
     if (busiestKey) {
       const [bx, by] = busiestKey.split(',').map(Number);
@@ -494,6 +520,12 @@
   // 'input' (not 'change') for live preview while dragging the color picker.
   gridLineColorInput.addEventListener('input', () => {
     state.gridLineColor = gridLineColorInput.value;
+    if (state.records.length) renderDieDetail();
+  });
+
+  toggleCoordNumbersBtn.addEventListener('click', () => {
+    state.showCoordNumbers = !state.showCoordNumbers;
+    toggleCoordNumbersBtn.setAttribute('aria-pressed', String(state.showCoordNumbers));
     if (state.records.length) renderDieDetail();
   });
 
@@ -722,8 +754,10 @@
     statTotalDefects.textContent = totalDefects.toLocaleString();
     renderLegend();
 
-    // reflect current selection highlight(s), if any
-    for (const key of state.selectedDies) {
+    // reflect current selection highlight(s), if any -- a die is outlined if
+    // any one of its defects is selected (the wafer map can't show partial
+    // per-defect selection at this zoom level).
+    for (const key of getSelectedDieKeys()) {
       const [sx, sy] = key.split(',');
       const sel = waferSvg.querySelector(`.die-rect[data-die-x="${sx}"][data-die-y="${sy}"]`);
       if (sel) sel.classList.add('selected');
@@ -732,23 +766,30 @@
 
   /* ===================== Die inspector ===================== */
   function updateDieCardTitle() {
-    const keys = [...state.selectedDies];
-    if (keys.length === 0) {
+    const selectedCount = state.selectedDefects.size;
+    if (selectedCount === 0) {
       dieCardTitle.textContent = 'All dies';
-    } else if (keys.length === 1) {
-      const [x, y] = keys[0].split(',');
-      const defects = state.defectsByDie.get(keys[0]) || [];
-      dieCardTitle.textContent = `Die (${x}, ${y}) — ${defects.length} defect${defects.length === 1 ? '' : 's'}`;
+      return;
+    }
+    const dieKeys = [...getSelectedDieKeys()];
+    if (dieKeys.length === 1) {
+      const [x, y] = dieKeys[0].split(',');
+      const total = (state.defectsByDie.get(dieKeys[0]) || []).length;
+      dieCardTitle.textContent = selectedCount === total
+        ? `Die (${x}, ${y}) — ${total} defect${total === 1 ? '' : 's'}`
+        : `Die (${x}, ${y}) — ${selectedCount} of ${total} defect${total === 1 ? '' : 's'} selected`;
     } else {
-      let total = 0;
-      for (const k of keys) total += (state.defectsByDie.get(k) || []).length;
-      dieCardTitle.textContent = `${keys.length} dies selected — ${total} defect${total === 1 ? '' : 's'}`;
+      dieCardTitle.textContent =
+        `${selectedCount} defect${selectedCount === 1 ? '' : 's'} selected across ${dieKeys.length} dies`;
     }
   }
 
-  // Plain click: select just this die (replace any existing selection).
+  // Wafer map plain click: select this die's entire set of defects (replacing
+  // any existing selection) -- the wafer map has no way to target one
+  // specific defect, only a die as a whole.
   function selectDie(x, y) {
-    state.selectedDies = new Set([dieKey(x, y)]);
+    const defects = state.defectsByDie.get(dieKey(x, y)) || [];
+    state.selectedDefects = new Set(defects.map((r) => r.recId));
     updateDieCardTitle();
     renderDieDetail();
     renderWafer(); // refresh selection outline
@@ -757,38 +798,62 @@
     if (fullViewModal.hidden) dieCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  // Ctrl/Cmd/Shift-click: add or remove this die from the current selection,
-  // for inspecting several dies' defects together.
+  // Wafer map Ctrl/Cmd/Shift-click: add or remove this die's whole set of
+  // defects from the current selection, for inspecting several dies together.
   function toggleDieSelection(x, y) {
-    const key = dieKey(x, y);
-    if (state.selectedDies.has(key)) state.selectedDies.delete(key);
-    else state.selectedDies.add(key);
+    const defects = state.defectsByDie.get(dieKey(x, y)) || [];
+    const allSelected = defects.length > 0 && defects.every((r) => state.selectedDefects.has(r.recId));
+    for (const rec of defects) {
+      if (allSelected) state.selectedDefects.delete(rec.recId);
+      else state.selectedDefects.add(rec.recId);
+    }
+    updateDieCardTitle();
+    renderDieDetail();
+    renderWafer();
+  }
+
+  // Die defect map plain click on a dot: select just that ONE defect
+  // (replacing any existing selection) -- unlike the wafer map, individual
+  // dots ARE precise enough to target a single defect.
+  function selectDefect(recId) {
+    state.selectedDefects = new Set([recId]);
+    updateDieCardTitle();
+    renderDieDetail();
+    renderWafer();
+  }
+
+  // Die defect map Ctrl/Cmd/Shift-click on a dot: add or remove just that one
+  // defect from the current selection.
+  function toggleDefectSelection(recId) {
+    if (state.selectedDefects.has(recId)) state.selectedDefects.delete(recId);
+    else state.selectedDefects.add(recId);
     updateDieCardTitle();
     renderDieDetail();
     renderWafer();
   }
 
   function clearSelection() {
-    if (state.selectedDies.size === 0) return;
-    state.selectedDies = new Set();
+    if (state.selectedDefects.size === 0) return;
+    state.selectedDefects = new Set();
     updateDieCardTitle();
     renderDieDetail();
     renderWafer();
   }
 
-  // Rubber-band multi-select, usable on both the wafer map (over .die-rect)
-  // and the die defect map's composite plot (over .defect-dot, using each
-  // dot's own data-die-x/y). Hold Ctrl/Cmd/Shift and drag to draw a box,
-  // adding every matching element it touches to the selection (on top of
-  // individual Ctrl/Shift-click). A plain click on empty background, with no
-  // drag, clears the selection instead. Both surfaces tile almost
+  // Rubber-band multi-select, usable on both the wafer map (over .die-rect,
+  // selecting a whole die's defects per rect touched) and the die defect
+  // map's composite plot (over .defect-dot, selecting only the exact defects
+  // touched -- getRecIds decides which). Hold Ctrl/Cmd/Shift and drag to draw
+  // a box, adding every matching element's recId(s) to the selection (on top
+  // of individual Ctrl/Shift-click). A plain click on empty background, with
+  // no drag, clears the selection instead. Both surfaces tile almost
   // edge-to-edge (dies) or can be densely packed (dots), so the drag has to
   // be allowed to start ON an item too -- it's only treated as a real drag
   // once the mouse actually moves; a same-spot mousedown+mouseup still lets
   // that item's own click handler run untouched (native click semantics:
   // click won't fire at all if the mouse moved off the original element by
   // mouseup).
-  function setupDragSelect(container, selectionBoxEl, itemSelector) {
+  function setupDragSelect(container, selectionBoxEl, itemSelector, getRecIds) {
     let drag = null;
 
     container.addEventListener('mousedown', (e) => {
@@ -829,8 +894,9 @@
           const r = el.getBoundingClientRect();
           const intersects = r.left < right && r.right > left && r.top < bottom && r.bottom > top;
           if (intersects) {
-            const key = dieKey(Number(el.getAttribute('data-die-x')), Number(el.getAttribute('data-die-y')));
-            if (!state.selectedDies.has(key)) { state.selectedDies.add(key); changed = true; }
+            for (const recId of getRecIds(el)) {
+              if (!state.selectedDefects.has(recId)) { state.selectedDefects.add(recId); changed = true; }
+            }
           }
         });
         if (changed) { updateDieCardTitle(); renderDieDetail(); renderWafer(); }
@@ -843,8 +909,11 @@
     });
   }
 
-  setupDragSelect(waferStage, waferSelectionBox, '.die-rect');
-  setupDragSelect(dieSvgWrap, dieSelectionBox, '.defect-dot');
+  setupDragSelect(waferStage, waferSelectionBox, '.die-rect', (el) => {
+    const key = dieKey(Number(el.getAttribute('data-die-x')), Number(el.getAttribute('data-die-y')));
+    return (state.defectsByDie.get(key) || []).map((r) => r.recId);
+  });
+  setupDragSelect(dieSvgWrap, dieSelectionBox, '.defect-dot', (el) => [Number(el.getAttribute('data-rec-id'))]);
 
   function niceStep(rough) {
     if (!(rough > 0)) return 1;
@@ -862,6 +931,7 @@
   function renderDieDetail() {
     dieSvg.innerHTML = '';
     dieDefectList.innerHTML = '';
+    dieSvg.classList.toggle('hide-coord-numbers', !state.showCoordNumbers);
 
     // Composite view: every defect from every die is plotted (all dies share
     // the same Die Size, so they all fit the same box); only the selected
@@ -1003,13 +1073,16 @@
       class: 'axis-label tick-label', x: centerPx - plotHalfWidthPx + 4, y: centerPx - plotHalfHeightPx + 12,
     })).textContent = 'µm';
 
-    // Plot every plottable defect from every die. When one or more dies are
-    // selected, their own points are drawn on top, larger and in the accent
-    // color, while everything else is dimmed for pattern context. With no
+    // Plot every plottable defect from every die. When one or more individual
+    // defects are selected, exactly those points are drawn on top, larger and
+    // in the accent color, while everything else (including other defects
+    // from the SAME die) is dimmed for pattern context -- selection is
+    // per-defect, not per-die, so picking one corner of a die doesn't light
+    // up that die's unrelated defects elsewhere on the plot. With no
     // selection, every dot is drawn the same (no dimming) since nothing is
     // being emphasized.
-    const hasSelection = state.selectedDies.size > 0;
-    const isSelectedRec = (rec) => hasSelection && state.selectedDies.has(dieKey(rec.dieX, rec.dieY));
+    const hasSelection = state.selectedDefects.size > 0;
+    const isSelectedRec = (rec) => hasSelection && state.selectedDefects.has(rec.recId);
     const plotOrder = state.records
       .filter((rec) => rec.gdsXUm !== null && rec.gdsYUm !== null)
       .sort((a, b) => Number(isSelectedRec(a)) - Number(isSelectedRec(b))); // selected drawn last (on top)
@@ -1026,7 +1099,7 @@
       const dotClass = !hasSelection ? 'defect-dot' : (selected ? 'defect-dot highlighted' : 'defect-dot dimmed');
       const dot = svgEl('circle', {
         class: dotClass, cx: px, cy: py, r: !hasSelection ? 4 : (selected ? 5 : 3),
-        'data-die-x': rec.dieX, 'data-die-y': rec.dieY,
+        'data-die-x': rec.dieX, 'data-die-y': rec.dieY, 'data-rec-id': rec.recId,
       });
       const tipLines = [`Die (${rec.dieX}, ${rec.dieY})`];
       if (rec.ecid !== null && rec.ecid !== undefined && rec.ecid !== '') tipLines.push(`ECID: ${rec.ecid}`);
@@ -1037,31 +1110,29 @@
       dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
       dot.addEventListener('mouseleave', hideTooltip);
       dot.addEventListener('click', (e) => {
-        if (e.ctrlKey || e.metaKey || e.shiftKey) toggleDieSelection(rec.dieX, rec.dieY);
-        else selectDie(rec.dieX, rec.dieY);
+        if (e.ctrlKey || e.metaKey || e.shiftKey) toggleDefectSelection(rec.recId);
+        else selectDefect(rec.recId);
       });
       group.appendChild(dot);
     }
 
     dieSvg.appendChild(group);
 
-    // Defect list stays scoped to the selected die(s) only, combined across
-    // all of them when more than one is selected.
+    // Defect list stays scoped to exactly the selected defect(s), regardless
+    // of how many different dies they belong to.
     if (!hasSelection) {
       const p = document.createElement('p');
       p.className = 'muted small';
-      p.textContent = 'Click a die on the wafer map to see its defect list.';
+      p.textContent = 'Click a die on the wafer map, or a defect dot below, to see it here.';
       dieDefectList.appendChild(p);
       return;
     }
     const combinedDefects = state.records.filter(isSelectedRec);
-    const multiSelect = state.selectedDies.size > 1;
+    const multiSelect = getSelectedDieKeys().size > 1;
     if (!combinedDefects.length) {
       const p = document.createElement('p');
       p.className = 'muted small';
-      p.textContent = multiSelect
-        ? 'The selected dies have no recorded defects.'
-        : 'This die has no recorded defects.';
+      p.textContent = 'This die has no recorded defects.';
       dieDefectList.appendChild(p);
       return;
     }
@@ -1099,7 +1170,7 @@
   }
 
   closeDieCard.addEventListener('click', () => {
-    state.selectedDies = new Set();
+    state.selectedDefects = new Set();
     dieCardTitle.textContent = 'All dies';
     if (state.records.length) {
       renderDieDetail();

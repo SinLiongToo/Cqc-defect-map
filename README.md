@@ -31,24 +31,24 @@ Everything runs in the browser — the file never leaves your machine.
   die at its exact (GDS-X, GDS-Y) absolute coordinate, in the shared
   die-local coordinate system (all dies use the same Die Size), with grid
   lines (red by default, denser than before, color customizable via
-  **Grid Color**) and a ruler (tick marks +
-  µm labels, in absolute coordinates matching the tooltips) on both axes —
-  useful for spotting systematic vs. random defect clustering across the
-  whole wafer. Click a die on the wafer map — or a dot on the composite
-  plot itself, from any die — to highlight that die's own points (larger,
-  full color) against everything else (small, dimmed) and sync the
-  highlight back to the wafer map; **Ctrl/Cmd/Shift-click** instead adds or
-  removes a die from the selection, so several dies' defects can be
-  inspected together (the list then shows which die each row is from). On
-  **either map**, **Ctrl/Cmd/Shift-drag** draws a selection box and adds
-  every die (or dot) it touches in one go — items tile edge-to-edge or can
-  sit densely packed, so the drag can start right on one, not just bare
-  background; a plain click on empty space clears the whole selection. The
-  same drag-select still works after opening Full View. The defect
-  list to the right of the plot stays scoped to whichever die(s) are
-  highlighted, with its own hover tooltips. Starts
-  auto-highlighted on the die with the most defects; "Clear selection"
-  drops the highlight but keeps the composite plot visible. A
+  **Grid Color**, and toggleable with the ruler's coordinate numbers via
+  the header icon) and a ruler (tick marks + µm labels, in absolute
+  coordinates matching the tooltips) on both axes — useful for spotting
+  systematic vs. random defect clustering across the whole wafer.
+  **Selection is per-defect on this plot**: clicking (or Ctrl/Shift-drag
+  boxing) a dot highlights exactly that defect (or those defects) —
+  picking one corner of a die doesn't light up that die's other, unrelated
+  defects elsewhere on the plot. Clicking a die on the **wafer map**
+  instead selects that die's *entire* set of defects as a block (it has no
+  way to target one specific defect), syncing an outline back there too.
+  Either way, a plain click on empty space clears the whole selection, and
+  the defect list to the right of the plot always matches exactly what's
+  highlighted (labeled per-die when more than one die is represented). All
+  of this keeps working after opening Full View — the toolbar (GDS Origin
+  Offset, Rotation, Grid Color, coordinate-number toggle) moves into the
+  modal along with the plot, rather than being stranded behind it. Starts
+  auto-highlighted on the die with the most defects (as a block); "Clear
+  selection" drops the highlight but keeps the composite plot visible. A
   **Rotation** control (0°/90°/180°/270°) spins the whole plot to match a
   die's actual physical orientation — grid, ticks, and dots rotate
   together while labels stay upright. The two maps sit side by side on
@@ -104,10 +104,11 @@ Everything runs in the browser — the file never leaves your machine.
 3. Set **Wafer Size**, **Die Size X/Y**, and **Notch Direction** to match
    your data (before or after uploading — both work).
 4. Hover dies on the wafer map to inspect coordinates; click a die to
-   highlight its defects in the die defect map (side by side, or below it
-   on narrower screens). Ctrl/Cmd/Shift-click (or -drag a box) to add more
-   dies to the selection instead of replacing it; click empty space to
-   clear the whole selection.
+   highlight all of its defects in the die defect map (side by side, or
+   below it on narrower screens) — or click an individual dot there to
+   highlight just that one defect. Ctrl/Cmd/Shift-click (or -drag a box) on
+   either map adds more to the selection instead of replacing it; click
+   empty space to clear the whole selection.
 5. Click the full-view icon on the die defect map's header to inspect the
    pattern at a larger size, or the help icon in the top bar for a
    walkthrough and the file format reference at any time.
