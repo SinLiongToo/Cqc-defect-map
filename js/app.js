@@ -29,6 +29,13 @@
     centerOffsetY: 0,
     gdsOffsetXUm: 0,
     gdsOffsetYUm: 0,
+    // Set by auto-calibrate: the absolute GDS-X/Y center derived purely from
+    // loaded data (min+max midpoint), independent of Die Size. When set, this
+    // takes priority over gdsOffsetXUm/YUm so the calibration stays correct
+    // even if Die Size changes afterward. Cleared the moment the user edits
+    // the offset fields manually.
+    gdsCalibratedCenterXUm: null,
+    gdsCalibratedCenterYUm: null,
     dieRotationDeg: 0,
     gridLineColor: null,    // hex string once user picks one, else CSS default
     notch: 'down',
@@ -76,6 +83,8 @@
   const legend = el('legend');
   const waferSvg = el('waferSvg');
   const waferEmptyState = el('waferEmptyState');
+  const waferStage = el('waferStage');
+  const waferSelectionBox = el('waferSelectionBox');
   const dieCard = el('dieCard');
   const dieCardTitle = el('dieCardTitle');
   const dieSvg = el('dieSvg');
@@ -474,6 +483,12 @@
     input.addEventListener('change', () => { readInputs(); render(); });
   });
 
+  // Manually editing the offset fields overrides (and drops) any prior
+  // auto-calibration lock, so the typed value actually takes effect instead
+  // of being recomputed from the locked calibrated center on next render.
+  gdsOffsetXInput.addEventListener('input', () => { state.gdsCalibratedCenterXUm = null; });
+  gdsOffsetYInput.addEventListener('input', () => { state.gdsCalibratedCenterYUm = null; });
+
   // 'input' (not 'change') for live preview while dragging the color picker.
   gridLineColorInput.addEventListener('input', () => {
     state.gridLineColor = gridLineColorInput.value;
@@ -505,6 +520,9 @@
   // defect map -- nudges the assumed die center (normally dieSize/2) so that
   // the midpoint of all loaded defects' GDS-X/GDS-Y lines up with it, correcting
   // a systematic calibration bias in the inspection tool's coordinate output.
+  // The calibrated center is derived purely from the data (its min/max
+  // midpoint) with no reference to Die Size, so it stays correct even if Die
+  // Size is changed afterward -- see gdsCalibratedCenterXUm/YUm.
   autoCalibrateGdsBtn.addEventListener('click', () => {
     if (!state.records.length) return;
     let minX = Infinity;
@@ -519,14 +537,9 @@
       maxY = Math.max(maxY, rec.gdsYUm);
     }
     if (!Number.isFinite(minX)) return; // no defect had a GDS location to calibrate from
-    readInputs();
-    const baseCenterXUm = (state.dieSizeX * 1000) / 2;
-    const baseCenterYUm = (state.dieSizeY * 1000) / 2;
-    state.gdsOffsetXUm = Math.round((minX + maxX) / 2 - baseCenterXUm);
-    state.gdsOffsetYUm = Math.round((minY + maxY) / 2 - baseCenterYUm);
-    gdsOffsetXInput.value = state.gdsOffsetXUm;
-    gdsOffsetYInput.value = state.gdsOffsetYUm;
-    render();
+    state.gdsCalibratedCenterXUm = (minX + maxX) / 2;
+    state.gdsCalibratedCenterYUm = (minY + maxY) / 2;
+    render(); // updates the offset fields' displayed value too, see renderDieDetail
   });
 
   /* ===================== Wafer geometry ===================== */
@@ -753,6 +766,78 @@
     renderWafer();
   }
 
+  function clearSelection() {
+    if (state.selectedDies.size === 0) return;
+    state.selectedDies = new Set();
+    updateDieCardTitle();
+    renderDieDetail();
+    renderWafer();
+  }
+
+  // Rubber-band multi-select on the wafer map: hold Ctrl/Cmd/Shift and drag to
+  // draw a box, adding every die it touches to the selection (on top of
+  // individual Ctrl/Shift-click). A plain click on empty background, with no
+  // drag, clears the selection instead. Dies tile the wafer edge-to-edge with
+  // almost no gap between them, so the drag has to be allowed to start ON a
+  // die-rect too -- it's only treated as a real drag once the mouse actually
+  // moves; a same-spot mousedown+mouseup still lets the die's own click
+  // handler run untouched (native click semantics: it won't fire at all if
+  // the mouse moved off the original element by mouseup).
+  let waferDrag = null;
+
+  waferStage.addEventListener('mousedown', (e) => {
+    waferDrag = {
+      modifier: e.ctrlKey || e.metaKey || e.shiftKey,
+      startX: e.clientX, startY: e.clientY, moved: false,
+      startedOnDie: !!e.target.closest('.die-rect'),
+    };
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!waferDrag) return;
+    if (Math.abs(e.clientX - waferDrag.startX) > 3 || Math.abs(e.clientY - waferDrag.startY) > 3) {
+      waferDrag.moved = true;
+    }
+    if (waferDrag.modifier && waferDrag.moved) {
+      const left = Math.min(waferDrag.startX, e.clientX);
+      const top = Math.min(waferDrag.startY, e.clientY);
+      waferSelectionBox.style.left = `${left}px`;
+      waferSelectionBox.style.top = `${top}px`;
+      waferSelectionBox.style.width = `${Math.abs(e.clientX - waferDrag.startX)}px`;
+      waferSelectionBox.style.height = `${Math.abs(e.clientY - waferDrag.startY)}px`;
+      waferSelectionBox.hidden = false;
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!waferDrag) return;
+    const drag = waferDrag;
+    waferDrag = null;
+    waferSelectionBox.hidden = true;
+
+    if (drag.modifier && drag.moved) {
+      const left = Math.min(drag.startX, e.clientX);
+      const right = Math.max(drag.startX, e.clientX);
+      const top = Math.min(drag.startY, e.clientY);
+      const bottom = Math.max(drag.startY, e.clientY);
+      let changed = false;
+      document.querySelectorAll('.die-rect').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const intersects = r.left < right && r.right > left && r.top < bottom && r.bottom > top;
+        if (intersects) {
+          const key = dieKey(Number(el.getAttribute('data-die-x')), Number(el.getAttribute('data-die-y')));
+          if (!state.selectedDies.has(key)) { state.selectedDies.add(key); changed = true; }
+        }
+      });
+      if (changed) { updateDieCardTitle(); renderDieDetail(); renderWafer(); }
+    } else if (!drag.modifier && !drag.moved && !drag.startedOnDie) {
+      // Background click with no drag and no modifier -- clear the selection.
+      // (A same-spot click that started on a die is left entirely to that
+      // die's own click handler, whether or not a modifier was held.)
+      clearSelection();
+    }
+  });
+
   function niceStep(rough) {
     if (!(rough > 0)) return 1;
     const exp = Math.floor(Math.log10(rough));
@@ -820,11 +905,24 @@
     // Ruler: grid lines + tick marks + um labels along both axes, spaced at a
     // "nice" round interval. The assumed center (where GDS-X/Y = dieSize/2
     // normally lands) can be nudged by the GDS Origin Offset calibration, to
-    // correct a systematic measurement bias.
+    // correct a systematic measurement bias. Once auto-calibrated, the
+    // absolute center (data-derived, independent of Die Size) takes priority
+    // over the offset so it stays correct across Die Size changes; the
+    // offset fields are kept in sync purely for display.
     const halfWidthUm = halfMmX * 1000;
     const halfHeightUm = halfMmY * 1000;
-    const assumedCenterXUm = halfWidthUm + state.gdsOffsetXUm;
-    const assumedCenterYUm = halfHeightUm + state.gdsOffsetYUm;
+    const isCalibratedX = state.gdsCalibratedCenterXUm !== null;
+    const isCalibratedY = state.gdsCalibratedCenterYUm !== null;
+    const assumedCenterXUm = isCalibratedX ? state.gdsCalibratedCenterXUm : halfWidthUm + state.gdsOffsetXUm;
+    const assumedCenterYUm = isCalibratedY ? state.gdsCalibratedCenterYUm : halfHeightUm + state.gdsOffsetYUm;
+    if (isCalibratedX) {
+      state.gdsOffsetXUm = Math.round(assumedCenterXUm - halfWidthUm);
+      gdsOffsetXInput.value = state.gdsOffsetXUm;
+    }
+    if (isCalibratedY) {
+      state.gdsOffsetYUm = Math.round(assumedCenterYUm - halfHeightUm);
+      gdsOffsetYInput.value = state.gdsOffsetYUm;
+    }
     const pxPerUm = mmToPx / 1000;
     const TARGET_TICKS = 4;
     const stepUm = niceStep(Math.max(halfWidthUm, halfHeightUm) / TARGET_TICKS);

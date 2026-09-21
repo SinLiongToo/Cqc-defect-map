@@ -38,9 +38,13 @@ Everything runs in the browser — the file never leaves your machine.
   full color) against everything else (small, dimmed) and sync the
   highlight back to the wafer map; **Ctrl/Cmd/Shift-click** instead adds or
   removes a die from the selection, so several dies' defects can be
-  inspected together (the list then shows which die each row is from).
-  The defect list to the right of the plot stays scoped to whichever
-  die(s) are highlighted, with its own hover tooltips. Starts
+  inspected together (the list then shows which die each row is from). On
+  the wafer map, **Ctrl/Cmd/Shift-drag** draws a selection box and adds
+  every die it touches in one go — dies tile the wafer edge-to-edge, so the
+  drag can start on a die itself, not just bare background; a plain click
+  on empty space (outside any die) clears the whole selection. The defect
+  list to the right of the plot stays scoped to whichever die(s) are
+  highlighted, with its own hover tooltips. Starts
   auto-highlighted on the die with the most defects; "Clear selection"
   drops the highlight but keeps the composite plot visible. A
   **Rotation** control (0°/90°/180°/270°) spins the whole plot to match a
@@ -69,10 +73,14 @@ Everything runs in the browser — the file never leaves your machine.
   Offset (µm)" X/Y control (with its own auto-calibrate icon, same pattern
   again) nudges the assumed die center away from the default `dieSize/2` —
   useful when an inspection tool's coordinate output has a consistent
-  measurement bias. Auto-calibrate sets it so the midpoint of all loaded
-  defects' GDS-X/GDS-Y lines up with the die center; tooltips and the
-  ruler still show/label the real values from the file, only the plotted
-  position shifts.
+  measurement bias. Auto-calibrate derives the target center purely from
+  the loaded data (the min/max midpoint of all defects' GDS-X/GDS-Y) with
+  no reference to Die Size, and keeps that absolute center locked in even
+  if Die Size is changed afterward — the displayed offset value updates to
+  match, but the actual calibrated position doesn't drift. Editing the
+  offset fields by hand releases that lock. Tooltips and the ruler still
+  show/label the real values from the file; only the plotted position
+  shifts.
 - **Full view**: an icon on the die defect map's header opens it in a large
   modal (same live SVG and defect list, just reparented and sized bigger —
   no data or interactivity lost) for closer inspection of the defect
@@ -95,8 +103,9 @@ Everything runs in the browser — the file never leaves your machine.
    your data (before or after uploading — both work).
 4. Hover dies on the wafer map to inspect coordinates; click a die to
    highlight its defects in the die defect map (side by side, or below it
-   on narrower screens). Ctrl/Cmd/Shift-click to add more dies to the
-   selection instead of replacing it.
+   on narrower screens). Ctrl/Cmd/Shift-click (or -drag a box) to add more
+   dies to the selection instead of replacing it; click empty space to
+   clear the whole selection.
 5. Click the full-view icon on the die defect map's header to inspect the
    pattern at a larger size, or the help icon in the top bar for a
    walkthrough and the file format reference at any time.

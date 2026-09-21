@@ -152,11 +152,12 @@
       <section class="stage-card">
         <div class="stage-header">
           <h2>Wafer Map</h2>
-          <span class="muted small">Hover a die for its coordinate · click a die to highlight its defects below · Ctrl/Shift-click to select multiple dies</span>
+          <span class="muted small">Hover a die for its coordinate · click a die to highlight its defects below, click empty space to clear · Ctrl/Shift-click (or Ctrl/Shift-drag a box) to select multiple dies</span>
         </div>
         <div class="wafer-stage" id="waferStage">
           <svg id="waferSvg" viewBox="0 0 640 640" role="img" aria-label="Wafer map"></svg>
           <p class="empty-state" id="waferEmptyState">Set wafer/die parameters, then upload a CSV to render the wafer map.</p>
+          <div class="selection-box" id="waferSelectionBox" hidden></div>
         </div>
       </section>
 
@@ -225,7 +226,7 @@
         <ol class="small guide-list">
           <li>Upload a defect file (CSV, TSV, or XLSX) at the top of the sidebar.</li>
           <li>Set <strong>Wafer Size</strong>, <strong>Die Size</strong>, and <strong>Notch Direction</strong> to match your data — before or after uploading, both work.</li>
-          <li>Hover a die on the wafer map for its coordinate; click a die to highlight its defects in the die defect map. Ctrl/Cmd/Shift-click to select multiple dies at once.</li>
+          <li>Hover a die on the wafer map for its coordinate; click a die to highlight its defects in the die defect map. Ctrl/Cmd/Shift-click, or -drag a box, to select multiple dies at once; click empty space to clear the selection.</li>
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Click the full-view icon on the die defect map to inspect the defect pattern at a larger size.</li>
         </ol>

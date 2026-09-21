@@ -202,7 +202,11 @@ code { font-family: var(--font-mono); }
   border-radius: 8px; background: var(--bg-inset); cursor: pointer;
 }
 
-.wafer-stage { position: relative; display: flex; justify-content: center; }
+.wafer-stage { position: relative; display: flex; justify-content: center; cursor: default; user-select: none; }
+.selection-box {
+  position: fixed; border: 1.5px dashed var(--accent); background: var(--accent-soft);
+  pointer-events: none; z-index: 60;
+}
 #waferSvg { width: 100%; max-width: 640px; height: auto; }
 .empty-state {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
