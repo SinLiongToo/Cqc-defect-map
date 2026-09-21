@@ -32,10 +32,12 @@ Everything runs in the browser — the file never leaves your machine.
   die-local coordinate system (all dies use the same Die Size), with a
   ruler (tick marks + µm labels, in absolute coordinates matching the
   tooltips) on both axes — useful for spotting systematic vs. random defect
-  clustering across the whole wafer. Click a die on the wafer map to
-  highlight that die's own points (larger, full color) against everything
-  else (small, dimmed); the defect list to the right of the plot stays
-  scoped to the highlighted die, with its own hover tooltips. Starts
+  clustering across the whole wafer. Click a die on the wafer map — or a
+  dot on the composite plot itself, from any die — to highlight that die's
+  own points (larger, full color) against everything else (small, dimmed)
+  and sync the highlight back to the wafer map; the defect list to the
+  right of the plot stays scoped to the highlighted die, with its own
+  hover tooltips. Starts
   auto-highlighted on the die with the most defects; "Clear selection"
   drops the highlight but keeps the composite plot visible. The two maps
   sit side by side on wide screens (≥1200px) and stack on narrower ones

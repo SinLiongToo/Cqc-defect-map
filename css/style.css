@@ -14,6 +14,9 @@
   --success: #34e28a;
   --warning: #ffb84d;
   --danger: #ff5470;
+  --sev-low: #ffd23f;
+  --sev-mid: #ff8a3d;
+  --sev-high: #e8283d;
   --die-empty-fill: #16202c;
   --die-empty-stroke: #2a3949;
   --shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
@@ -37,6 +40,9 @@
   --success: #12925a;
   --warning: #b3730c;
   --danger: #d13456;
+  --sev-low: #b3830c;
+  --sev-mid: #d9660c;
+  --sev-high: #c81e34;
   --die-empty-fill: #e6ecf3;
   --die-empty-stroke: #c7d3e0;
   --shadow: 0 16px 40px rgba(20, 30, 50, 0.12);
@@ -217,7 +223,7 @@ code { font-family: var(--font-mono); }
 .wafer-circle { fill: none; stroke: var(--border); stroke-width: 2; }
 .exclusion-ring { fill: none; stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 5 4; opacity: 0.7; }
 .notch-mark { fill: var(--bg); stroke: var(--border); stroke-width: 1.5; }
-.defect-dot { fill: var(--accent-2); stroke: var(--bg); stroke-width: 1; cursor: default; transition: r 0.1s ease; }
+.defect-dot { fill: var(--accent-2); stroke: var(--bg); stroke-width: 1; cursor: pointer; transition: r 0.1s ease; }
 .defect-dot:hover { filter: brightness(1.4); r: 7; }
 .defect-dot.highlighted { fill: var(--accent-2); stroke: var(--bg); stroke-width: 1.5; opacity: 1; }
 .defect-dot.dimmed { fill: var(--text-muted); stroke: none; opacity: 0.4; }

@@ -563,9 +563,9 @@
 
   function defectBucketColor(count) {
     if (count <= 0) return null;
-    if (count <= 2) return 'var(--warning)';
-    if (count <= 5) return 'var(--accent-2)';
-    return 'var(--danger)';
+    if (count <= 2) return 'var(--sev-low)';
+    if (count <= 5) return 'var(--sev-mid)';
+    return 'var(--sev-high)';
   }
 
   function formatEcidList(defects) {
@@ -594,9 +594,9 @@
     legend.innerHTML = '';
     const items = [
       { label: 'No defect', color: 'var(--die-empty-fill)' },
-      { label: '1–2 defects', color: 'var(--warning)' },
-      { label: '3–5 defects', color: 'var(--accent-2)' },
-      { label: '6+ defects', color: 'var(--danger)' },
+      { label: '1–2 defects', color: 'var(--sev-low)' },
+      { label: '3–5 defects', color: 'var(--sev-mid)' },
+      { label: '6+ defects', color: 'var(--sev-high)' },
     ];
     for (const item of items) {
       const wrap = document.createElement('span');
@@ -708,7 +708,9 @@
     dieCardTitle.textContent = `Die (${x}, ${y}) — ${defects.length} defect${defects.length === 1 ? '' : 's'}`;
     renderDieDetail(defects, x, y);
     renderWafer(); // refresh selection outline
-    dieCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Don't scroll the (now mostly empty) card into view while its contents
+    // are reparented into the full-view modal.
+    if (fullViewModal.hidden) dieCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function niceStep(rough) {
@@ -837,6 +839,7 @@
       dot.addEventListener('mouseenter', (e) => showTooltip(e.clientX, e.clientY, tipText));
       dot.addEventListener('mousemove', (e) => showTooltip(e.clientX, e.clientY, tipText));
       dot.addEventListener('mouseleave', hideTooltip);
+      dot.addEventListener('click', () => selectDie(rec.dieX, rec.dieY));
       dieSvg.appendChild(dot);
     }
 
