@@ -217,11 +217,17 @@
           <h2>Pareto Chart</h2>
           <label class="gds-calibration">
             <span class="muted small">Column</span>
-            <select id="paretoColumnSelect" class="calib-input calib-select" disabled></select>
+            <span class="combo">
+              <input type="text" id="paretoColumnInput" class="calib-input combo-input" placeholder="Select column…" autocomplete="off" disabled aria-label="Pareto column (type to search)" role="combobox" aria-expanded="false" />
+              <div class="combo-list" id="paretoColumnList" hidden role="listbox"></div>
+            </span>
           </label>
           <label class="gds-calibration">
             <span class="muted small">Group by</span>
-            <select id="paretoGroupSelect" class="calib-input calib-select" disabled></select>
+            <span class="combo">
+              <input type="text" id="paretoGroupInput" class="calib-input combo-input" placeholder="(None)" autocomplete="off" disabled aria-label="Pareto group-by column (type to search)" role="combobox" aria-expanded="false" />
+              <div class="combo-list" id="paretoGroupList" hidden role="listbox"></div>
+            </span>
           </label>
           <button type="button" class="icon-btn small-icon-btn" id="paretoFullViewBtn" title="Full view" aria-label="Open Pareto chart in full view">
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm16 0h-2v4h-4v2h6v-6Z"/></svg>
@@ -243,7 +249,10 @@
           <h2>Trend Chart</h2>
           <label class="gds-calibration">
             <span class="muted small">Date column</span>
-            <select id="trendColumnSelect" class="calib-input calib-select" disabled></select>
+            <span class="combo">
+              <input type="text" id="trendColumnInput" class="calib-input combo-input" placeholder="Select date column…" autocomplete="off" disabled aria-label="Trend date column (type to search)" role="combobox" aria-expanded="false" />
+              <div class="combo-list" id="trendColumnList" hidden role="listbox"></div>
+            </span>
           </label>
           <button type="button" class="icon-btn small-icon-btn" id="trendFullViewBtn" title="Full view" aria-label="Open Trend chart in full view">
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm16 0h-2v4h-4v2h6v-6Z"/></svg>
@@ -287,6 +296,7 @@
           <li>Hover a die on the wafer map for its coordinate. Clicking a wafer die highlights its <em>entire</em> set of defects; clicking a dot on the die defect map highlights just that <em>one</em> defect. Ctrl/Cmd/Shift-click, or -drag a box, on either map to add more to the selection; click empty space to clear it.</li>
           <li>Use <strong>Wafer Center</strong> and <strong>GDS Origin Offset</strong> (with their auto-calibrate icons) if the map doesn't line up with your data.</li>
           <li>Every plot (wafer map, die defect map, Pareto chart, Trend chart) has a full-view icon in its header to inspect it at a larger size in a modal.</li>
+          <li>The <strong>Column</strong>, <strong>Group by</strong>, and <strong>Date column</strong> pickers are type-to-search — click one and start typing to filter instead of scrolling through every column in a wide file; arrow keys + Enter to confirm, Escape to cancel.</li>
           <li>The <strong>Pareto Chart</strong> below the two maps counts how often each value of any column occurs (pick it from the <strong>Column</strong> dropdown) — sorted most to least common, with a cumulative-% line and an 80% "vital few" cutoff. It always covers every loaded defect, independent of whatever's selected above. Optionally pick a second column with <strong>Group by</strong> to split each bar into a color-coded breakdown (up to 8 named values plus a shared "Other"); a legend and the per-bar list both spell out the exact numbers, so color is never the only way to read it.</li>
           <li>The <strong>Trend Chart</strong> beside it counts defect rows per date, for any column whose name contains "date" — pick it from the <strong>Date column</strong> dropdown. A bare 4-digit value is read as a <code>YYWW</code> work-week code (e.g. <code>2405</code> = 2024, week 5); anything else is parsed as a normal date and collapsed to its calendar day. Only dates/weeks that actually appear in the file are plotted (gaps aren't filled in as zero); rows with a blank or unparseable value are excluded and noted below the chart.</li>
         </ol>

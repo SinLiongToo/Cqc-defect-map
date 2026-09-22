@@ -5,8 +5,8 @@
   // Bumped by hand on each ship (see the "ship" skill) -- there's no build
   // step to derive this from automatically, so it's the one thing that has
   // to be remembered and edited alongside a release rather than computed.
-  const APP_VERSION = 'v1.1.1';
-  const APP_UPDATED = '2026-09-22 05:47 (UTC+8)';
+  const APP_VERSION = 'v1.2.0';
+  const APP_UPDATED = '2026-09-23 06:57 (UTC+8)';
   const WAFER_DIAMETER_MM = { 8: 200, 12: 300 };
   const NOTCH_ANGLE_DEG = { down: 0, right: 90, up: 180, left: 270 };
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -155,8 +155,10 @@
   const fullViewTitle = el('fullViewTitle');
   const closeFullView = el('closeFullView');
   const paretoCard = el('paretoCard');
-  const paretoColumnSelect = el('paretoColumnSelect');
-  const paretoGroupSelect = el('paretoGroupSelect');
+  const paretoColumnInput = el('paretoColumnInput');
+  const paretoColumnList = el('paretoColumnList');
+  const paretoGroupInput = el('paretoGroupInput');
+  const paretoGroupList = el('paretoGroupList');
   const paretoSvg = el('paretoSvg');
   const paretoEmptyState = el('paretoEmptyState');
   const paretoList = el('paretoList');
@@ -164,13 +166,132 @@
   const paretoStage = el('paretoStage');
   const paretoFullViewBtn = el('paretoFullViewBtn');
   const trendCard = el('trendCard');
-  const trendColumnSelect = el('trendColumnSelect');
+  const trendColumnInput = el('trendColumnInput');
+  const trendColumnList = el('trendColumnList');
   const trendSvg = el('trendSvg');
   const trendEmptyState = el('trendEmptyState');
   const trendExcludedNote = el('trendExcludedNote');
   const trendSvgWrap = el('trendSvgWrap');
   const trendFullViewBtn = el('trendFullViewBtn');
   const appVersionInfo = el('appVersionInfo');
+
+  /* ===================== Searchable combobox ===================== */
+  // A lightweight typeahead replacement for a plain <select> -- filters as
+  // you type instead of requiring a long scroll through native options,
+  // which gets slow once a CSV has many columns. getOptions() is re-read on
+  // every open/keystroke so it always reflects the latest available
+  // columns (they can change on every file load); onSelect(value) fires
+  // exactly like a <select>'s 'change' event, once per actual choice.
+  function createCombobox({ inputEl, listEl, getOptions, onSelect }) {
+    let filtered = [];
+    let highlightIndex = -1;
+    let currentValue = null;
+
+    function labelFor(value) {
+      const found = getOptions().find((o) => o.value === value);
+      return found ? found.label : '';
+    }
+
+    function renderList(query) {
+      const all = getOptions();
+      const q = query.trim().toLowerCase();
+      filtered = q ? all.filter((o) => o.label.toLowerCase().includes(q)) : all;
+      listEl.innerHTML = '';
+      if (!filtered.length) {
+        const empty = document.createElement('div');
+        empty.className = 'combo-empty';
+        empty.textContent = 'No matches';
+        listEl.appendChild(empty);
+        return;
+      }
+      filtered.forEach((opt, i) => {
+        const item = document.createElement('div');
+        item.className = 'combo-option'
+          + (i === highlightIndex ? ' active' : '')
+          + (opt.value === currentValue ? ' selected' : '');
+        item.textContent = opt.label;
+        item.setAttribute('role', 'option');
+        // mousedown (not click) + preventDefault stops the input from
+        // blurring first -- a blur would close the list and revert the
+        // input's text before the click had a chance to register as a
+        // choice.
+        item.addEventListener('mousedown', (e) => { e.preventDefault(); choose(opt); });
+        listEl.appendChild(item);
+        if (i === highlightIndex) item.scrollIntoView({ block: 'nearest' });
+      });
+    }
+
+    function choose(opt) {
+      currentValue = opt.value;
+      inputEl.value = opt.label;
+      close();
+      onSelect(opt.value);
+    }
+
+    function open() {
+      highlightIndex = -1;
+      renderList('');
+      listEl.hidden = false;
+      inputEl.setAttribute('aria-expanded', 'true');
+    }
+
+    function close() {
+      listEl.hidden = true;
+      inputEl.setAttribute('aria-expanded', 'false');
+      highlightIndex = -1;
+    }
+
+    inputEl.addEventListener('focus', () => { inputEl.select(); open(); });
+    inputEl.addEventListener('input', () => {
+      highlightIndex = -1;
+      renderList(inputEl.value);
+      listEl.hidden = false;
+    });
+    inputEl.addEventListener('blur', () => {
+      inputEl.value = labelFor(currentValue);
+      close();
+    });
+    inputEl.addEventListener('keydown', (e) => {
+      if (listEl.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        open();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightIndex = Math.min(highlightIndex + 1, filtered.length - 1);
+        renderList(inputEl.value);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightIndex = Math.max(highlightIndex - 1, 0);
+        renderList(inputEl.value);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightIndex >= 0 && filtered[highlightIndex]) choose(filtered[highlightIndex]);
+        else if (filtered.length === 1) choose(filtered[0]);
+      } else if (e.key === 'Escape') {
+        inputEl.value = labelFor(currentValue);
+        close();
+        inputEl.blur();
+      }
+    });
+
+    return {
+      // Sets the combobox's current value (and enables it) -- called after
+      // (re)populating its option list, e.g. on file load.
+      setValue(value) {
+        currentValue = value;
+        inputEl.value = labelFor(value);
+        inputEl.disabled = false;
+      },
+      disable() {
+        currentValue = null;
+        inputEl.disabled = true;
+        inputEl.value = '';
+        close();
+      },
+    };
+  }
 
   /* ===================== Modals ===================== */
   function openModal(modal) { modal.hidden = false; }
@@ -526,19 +647,17 @@
   // a categorical defect classification -- die index / GDS coordinates /
   // ECID are technically selectable too, but rarely what someone actually
   // wants a Pareto breakdown of.
+  const paretoColumnCombo = createCombobox({
+    inputEl: paretoColumnInput, listEl: paretoColumnList,
+    getOptions: () => state.paretoColumns.map((c) => ({ value: c, label: c })),
+    onSelect: (value) => { state.paretoColumn = value; renderPareto(); },
+  });
+
   function populateParetoColumnSelect() {
     const prev = state.paretoColumn;
-    paretoColumnSelect.innerHTML = '';
-    for (const col of state.paretoColumns) {
-      const opt = document.createElement('option');
-      opt.value = col;
-      opt.textContent = col;
-      paretoColumnSelect.appendChild(opt);
-    }
-    paretoColumnSelect.disabled = false;
     const fallback = state.extraColumns[0] || state.columnMap.ecid || state.columnMap.dieX;
     state.paretoColumn = state.paretoColumns.includes(prev) ? prev : fallback;
-    paretoColumnSelect.value = state.paretoColumn;
+    paretoColumnCombo.setValue(state.paretoColumn);
   }
 
   // Rebuilds the "Group by" dropdown the same way, but defaults to off
@@ -546,22 +665,16 @@
   // Pareto column, stacking is an opt-in refinement, not something that
   // should suddenly appear (and repaint every bar) just because a new file
   // happened to load.
+  const paretoGroupCombo = createCombobox({
+    inputEl: paretoGroupInput, listEl: paretoGroupList,
+    getOptions: () => [{ value: '', label: '(None)' }, ...state.paretoColumns.map((c) => ({ value: c, label: c }))],
+    onSelect: (value) => { state.paretoGroupColumn = value; renderPareto(); },
+  });
+
   function populateParetoGroupSelect() {
     const prev = state.paretoGroupColumn;
-    paretoGroupSelect.innerHTML = '';
-    const noneOpt = document.createElement('option');
-    noneOpt.value = '';
-    noneOpt.textContent = '(None)';
-    paretoGroupSelect.appendChild(noneOpt);
-    for (const col of state.paretoColumns) {
-      const opt = document.createElement('option');
-      opt.value = col;
-      opt.textContent = col;
-      paretoGroupSelect.appendChild(opt);
-    }
-    paretoGroupSelect.disabled = false;
     state.paretoGroupColumn = prev === '' || state.paretoColumns.includes(prev) ? prev : '';
-    paretoGroupSelect.value = state.paretoGroupColumn;
+    paretoGroupCombo.setValue(state.paretoGroupColumn);
   }
 
   // Reads a record's value for any loaded column, whether it's one of the
@@ -577,39 +690,23 @@
     return rec.raw[colKey];
   }
 
-  paretoColumnSelect.addEventListener('change', () => {
-    state.paretoColumn = paretoColumnSelect.value;
-    renderPareto();
-  });
-
-  paretoGroupSelect.addEventListener('change', () => {
-    state.paretoGroupColumn = paretoGroupSelect.value;
-    renderPareto();
-  });
-
   // Rebuilds the Trend chart's date-column dropdown, scoped to only the
   // headers whose name contains "date" (case-insensitive) -- unlike the
   // Pareto column, this one can't offer every column, since a trend chart
   // is meaningless without something date-like on its x-axis.
+  const trendColumnCombo = createCombobox({
+    inputEl: trendColumnInput, listEl: trendColumnList,
+    getOptions: () => state.trendColumns.map((c) => ({ value: c, label: c })),
+    onSelect: (value) => { state.trendColumn = value; renderTrend(); },
+  });
+
   function populateTrendColumnSelect() {
     const prev = state.trendColumn;
     state.trendColumns = state.paretoColumns.filter((col) => col.toLowerCase().includes('date'));
-    trendColumnSelect.innerHTML = '';
-    for (const col of state.trendColumns) {
-      const opt = document.createElement('option');
-      opt.value = col;
-      opt.textContent = col;
-      trendColumnSelect.appendChild(opt);
-    }
-    trendColumnSelect.disabled = state.trendColumns.length === 0;
     state.trendColumn = state.trendColumns.includes(prev) ? prev : (state.trendColumns[0] || null);
-    if (state.trendColumn) trendColumnSelect.value = state.trendColumn;
+    if (state.trendColumn) trendColumnCombo.setValue(state.trendColumn);
+    else trendColumnCombo.disable();
   }
-
-  trendColumnSelect.addEventListener('change', () => {
-    state.trendColumn = trendColumnSelect.value;
-    renderTrend();
-  });
 
   csvInput.addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];

@@ -83,6 +83,12 @@ Everything runs in the browser — the file never leaves your machine.
   offset fields by hand releases that lock. Tooltips and the ruler still
   show/label the real values from the file; only the plotted position
   shifts.
+- **Searchable column pickers**: the **Column**, **Group by**, and **Date
+  column** dropdowns (Pareto/Trend charts) are type-to-filter comboboxes,
+  not plain `<select>` lists — click one and start typing to narrow it down
+  instead of scrolling through every column in a wide file. Arrow keys move
+  the highlight, Enter confirms, Escape cancels back to the current
+  selection.
 - **Pareto chart**: below the two maps, counts how often each value of *any*
   loaded column occurs — pick the column from the **Column** dropdown (every
   die_X/die_Y/GDS-X/GDS-Y/ECID field plus every extra column in the file is

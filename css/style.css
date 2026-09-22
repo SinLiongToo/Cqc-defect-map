@@ -233,6 +233,31 @@ code { font-family: var(--font-mono); }
   border-radius: 8px; background: var(--bg-inset); cursor: pointer;
 }
 
+/* ===================== Searchable combobox ===================== */
+/* A plain <select> gets slow to scroll through once a CSV has many columns
+   -- this pairs a text input (type to filter) with a floating option list,
+   for the Pareto/Trend column pickers. */
+.combo { position: relative; display: inline-block; }
+.combo-input { width: 160px; padding-right: 24px; cursor: text; }
+.combo-input:disabled { cursor: not-allowed; opacity: 0.6; }
+.combo::after {
+  content: ""; position: absolute; right: 9px; top: 50%; width: 7px; height: 7px;
+  border-right: 1.5px solid var(--text-muted); border-bottom: 1.5px solid var(--text-muted);
+  transform: translateY(-65%) rotate(45deg); pointer-events: none;
+}
+.combo-list {
+  position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: 320px;
+  max-height: 220px; overflow-y: auto; background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: var(--shadow); z-index: 50; font-family: var(--font-mono); font-size: 12px;
+}
+.combo-option {
+  padding: 7px 10px; cursor: pointer; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.combo-option:hover, .combo-option.active { background: var(--accent-soft); }
+.combo-option.selected { color: var(--accent); font-weight: 600; }
+.combo-empty { padding: 7px 10px; color: var(--text-muted); font-style: italic; }
+
 .wafer-stage { position: relative; display: flex; justify-content: center; cursor: default; user-select: none; }
 .selection-box {
   position: fixed; border: 1.5px dashed var(--accent); background: var(--accent-soft);
@@ -254,7 +279,6 @@ code { font-family: var(--font-mono); }
 }
 .defect-row div { display: flex; justify-content: space-between; gap: 8px; }
 .defect-row span.k { color: var(--text-muted); }
-#paretoColumnSelect, #paretoGroupSelect { min-width: 140px; }
 .pareto-row-head, .pareto-row-sub { display: flex; justify-content: space-between; gap: 8px; }
 .pareto-row-sub { color: var(--text-muted); margin-top: 2px; }
 .pareto-row.vital { border-color: var(--accent-2); }
